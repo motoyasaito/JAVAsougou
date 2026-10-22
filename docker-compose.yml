@@ -1,0 +1,41 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sougou_app
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sougou
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATASOURCE_USERNAME: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src # ソースをマウント（保存即反映のため）
+      - ./pom.xml:/app/pom.xml # pom.xml をマウント
+      - ./resources:/app/resources # 必要ならリソースをマウント
+      - ~/.m2:/root/.m2 # Maven の依存関係キャッシュ
+
+  postgres:
+    image: postgres:17
+    container_name: sougou_postgres_container
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sougou
+      POSTGRES_USER: postgres
+      TZ: "Asia/Tokyo"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "sougou"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db_data:
