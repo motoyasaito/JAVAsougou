@@ -7,7 +7,7 @@ DROP TABLE IF EXISTS areas;
 -- エリアテーブル
 CREATE TABLE areas (
     id   BIGSERIAL PRIMARY KEY,
-    name VARCHAR(10) NOT NULL UNIQUE
+    name VARCHAR(30) NOT NULL UNIQUE
 );
 
 -- 従業員テーブル（ドライバーと管理者を一つのテーブルで管理）
@@ -29,27 +29,26 @@ CREATE TABLE deliveries (
     tracking_number VARCHAR(12)  NOT NULL UNIQUE CHECK (tracking_number ~ '^[0-9]{12}$'),
     name            VARCHAR(50)  NOT NULL,
     address         VARCHAR(100) NOT NULL,
-    call_number     VARCHAR(11)  NOT NULL CHECK (call_number ~ '^[0-9]{11}$'),
+    call_number     VARCHAR(11)  NOT NULL CHECK (call_number ~ '^[0-9]{10,11}$'),
     email           VARCHAR(100) NOT NULL,
-    status          VARCHAR(50)  CHECK (status IN ('PREPARING', 'IN TRANSIT', 'OUT FOR DELIVERY', 'DELIVERED', 'ABSENT')),
+    status          VARCHAR(50)  NOT NULL DEFAULT 'PREPARING' CHECK (status IN ('PREPARING', 'IN TRANSIT', 'DELIVERED', 'ABSENT')),
     item_type       VARCHAR(50)  NOT NULL CHECK (item_type IN ('NORMAL', 'RAW FOOD', 'FROZEN', 'FRAGILE')),
-    driver_id       BIGINT,
-    delivery_date   VARCHAR(20)  NOT NULL,
-    delivery_time   VARCHAR(20)  NOT NULL,
+    driver_id       BIGINT,  -- roleがdriverのユーザーのみ（アプリ側でチェック）
+    delivery_date   DATE,
+    delivery_time   VARCHAR(20),
     created_at      TIMESTAMP    NOT NULL DEFAULT now(),
-    updated_at      TIMESTAMP    NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMP    NOT NULL DEFAULT now(),  -- 更新時はUPDATE文でnow()を設定する
     FOREIGN KEY (driver_id) REFERENCES users(id)
 );
 
--- 再配達テーブル
+-- 再配達テーブル（配送先名などはdeliveriesをJOINして参照）
 CREATE TABLE redeliveries (
-    id              BIGSERIAL PRIMARY KEY,
-    delivery_id     BIGINT      NOT NULL,
-    driver_id       BIGINT,
-    redelivery_date VARCHAR(20) NOT NULL,
-    redelivery_time VARCHAR(20) NOT NULL,
-    created_at      TIMESTAMP   NOT NULL DEFAULT now(),
-    updated_at      TIMESTAMP   NOT NULL DEFAULT now(),
-    FOREIGN KEY (delivery_id) REFERENCES deliveries(id),
-    FOREIGN KEY (driver_id)   REFERENCES users(id)
+    id                BIGSERIAL PRIMARY KEY,
+    delivery_id       BIGINT      NOT NULL,
+    allocation_status VARCHAR(50) NOT NULL DEFAULT 'UNASSIGNED' CHECK (allocation_status IN ('UNASSIGNED', 'DONE')),
+    redelivery_date   DATE,
+    redelivery_time   VARCHAR(20),
+    created_at        TIMESTAMP   NOT NULL DEFAULT now(),
+    updated_at        TIMESTAMP   NOT NULL DEFAULT now(),  -- 更新時はUPDATE文でnow()を設定する
+    FOREIGN KEY (delivery_id) REFERENCES deliveries(id)
 );
