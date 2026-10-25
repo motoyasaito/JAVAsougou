@@ -9,6 +9,9 @@ import org.springframework.http.ResponseEntity;//ステータスコードとレ�
 import org.springframework.web.bind.MethodArgumentNotValidException;//@vaidの入力チェックで引っかかった時に、springが投げる例外クラス
 import org.springframework.web.bind.annotation.ExceptionHandler;//
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 
 @RestControllerAdvice // すべてのコントローラーで起きた例外を、このクラスで受けとる。例外が起きたときにこの中のメソッドを呼ぶ
 public class GlobalExceptionHandler {
@@ -22,6 +25,21 @@ public class GlobalExceptionHandler {
         .toList();
 
     return build(HttpStatus.BAD_REQUEST, "入力内容に誤りがあります", details);// bulidメソッドにステータス（400）、メッセージ、項目の一覧を渡して、できたレスポンスを返す。
+  }
+
+  @ExceptionHandler(NoResourceFoundException.class)
+  public ResponseEntity<ErrorResponse> handleNotFound(NoResourceFoundException e) {
+    return build(HttpStatus.NOT_FOUND, "指定したURLは存在しません", List.of());
+  }
+
+  @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+  public ResponseEntity<ErrorResponse> handleMethodNoAllowed(HttpRequestMethodNotSupportedException e) {
+    return build(HttpStatus.METHOD_NOT_ALLOWED, "このURLでは" + e.getMethod() + "は使えません", List.of());
+  }
+
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  public ResponseEntity<ErrorResponse> handleNotReadable(HttpMessageNotReadableException e) {
+    return build(HttpStatus.BAD_REQUEST, "リクエストの形式が正しくありません", List.of());
   }
 
   @ExceptionHandler(Exception.class) // 上記で当てはまらないエラーをこっちで受けとる。Exceptionはほぼすべての例外クラスの親になる。
