@@ -2,13 +2,17 @@ package com.example.demo.exception;
 
 import com.example.demo.dto.ErrorResponse;//ErrorResponseのDTOを使えるようにしている
 import java.util.List;//detailの一覧を作成する
+
 import org.slf4j.Logger;//ログ作成のためのアイテム
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;//ステータスコードを名前で扱うためのもの
 import org.springframework.http.ResponseEntity;//ステータスコードとレスポンスの中身をまとめて返すためのクラス
 import org.springframework.web.bind.MethodArgumentNotValidException;//@vaidの入力チェックで引っかかった時に、springが投げる例外クラス
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;//
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -40,6 +44,25 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ErrorResponse> handleNotReadable(HttpMessageNotReadableException e) {
     return build(HttpStatus.BAD_REQUEST, "リクエストの形式が正しくありません", List.of());
+  }
+
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+    return build(HttpStatus.BAD_REQUEST, "パラメータの形式が正しくありません", List.of(e.getName() + ":形式が正しくありません"));
+  }
+
+  @ExceptionHandler(MissingServletRequestParameterException.class)
+  public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException e) {
+    return build(HttpStatus.BAD_REQUEST, "必須パラメータがありません", List.of(e.getParameterName() + ":パラメータがありません"));
+  }
+
+  @ExceptionHandler(HandlerMethodValidationException.class)
+  public ResponseEntity<ErrorResponse> handleParameterValidation(HandlerMethodValidationException e) {
+    List<String> details = e.getParameterValidationResults().stream()
+        .flatMap(result -> result.getResolvableErrors().stream()
+            .map(error -> result.getMethodParameter().getParameterName() + ":" + error.getDefaultMessage()))
+        .toList();
+    return build(HttpStatus.BAD_REQUEST, "入力内容に誤りがあります", details);
   }
 
   @ExceptionHandler(Exception.class) // 上記で当てはまらないエラーをこっちで受けとる。Exceptionはほぼすべての例外クラスの親になる。
