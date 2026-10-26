@@ -18,7 +18,7 @@ public interface DeliveryMapper {
       ORDER BY id
       LIMIT #{limit} OFFSET #{offset}
       """)
-  List<Delivery> findAll(@Param("limit") int limit, @Param("offset") int offset);
+  List<Delivery> findAll(@Param("limit") int limit, @Param("offset") long offset);
 
   // 配送物の全件数を取得する（ページ数の計算に使う）
   @Select("SELECT COUNT(*) FROM deliveries")
@@ -34,7 +34,7 @@ public interface DeliveryMapper {
       LIMIT #{limit} OFFSET #{offset}
       """)
   List<Delivery> findByDriverId(@Param("driverId") long driverId, @Param("deliveryDate") LocalDate deliveryDate,
-      @Param("limit") int limit, @Param("offset") int offset);
+      @Param("limit") int limit, @Param("offset") long offset);
 
   @Select("SELECT COUNT(*) FROM deliveries WHERE driver_id = #{driverId} AND delivery_date = #{deliveryDate}")
   long countByDriverId(@Param("driverId") long driverId, @Param("deliveryDate") LocalDate deliveryDate);

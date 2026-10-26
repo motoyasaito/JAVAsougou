@@ -19,7 +19,7 @@ public class DeliveryService {
 
   // 配送物の一覧を、page（0から始まるページ番号）とsize（1ページの件数）で取得する
   public PageResponse<DeliveryResponse> findAll(int page, int size) {
-    int offset = page * size; // 例: page=2, size=10 なら21件目から（20件飛ばす）
+    long offset = (long) page * size; // 例: page=2, size=10 なら21件目から（20件飛ばす）
 
     List<DeliveryResponse> content = deliveryMapper.findAll(size, offset).stream()
         .map(DeliveryResponse::from)
@@ -36,7 +36,7 @@ public class DeliveryService {
     } else {
       targetDate = deliveryDate;
     }
-    int offset = page * size;
+    long offset = (long) page * size;
 
     List<DeliveryResponse> content = deliveryMapper.findByDriverId(driverId, targetDate, size, offset).stream()
         .map(DeliveryResponse::from)
