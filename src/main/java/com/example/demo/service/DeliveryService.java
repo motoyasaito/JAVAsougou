@@ -3,6 +3,8 @@ package com.example.demo.service;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.mapper.DeliveryMapper;
+import java.time.ZoneId;
+import java.time.LocalDate;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +25,23 @@ public class DeliveryService {
         .map(DeliveryResponse::from)
         .toList();
     long total = deliveryMapper.count();
+
+    return PageResponse.of(content, page, size, total);
+  }
+
+  public PageResponse<DeliveryResponse> findByDriver(long driverId, LocalDate deliveryDate, int page, int size) {
+    LocalDate targetDate;
+    if (deliveryDate == null) {
+      targetDate = LocalDate.now(ZoneId.of("Asia/Tokyo"));
+    } else {
+      targetDate = deliveryDate;
+    }
+    int offset = page * size;
+
+    List<DeliveryResponse> content = deliveryMapper.findByDriverId(driverId, targetDate, size, offset).stream()
+        .map(DeliveryResponse::from)
+        .toList();
+    long total = deliveryMapper.countByDriverId(driverId, targetDate);
 
     return PageResponse.of(content, page, size, total);
   }
