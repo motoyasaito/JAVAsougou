@@ -1,119 +1,165 @@
-# パッケージ構成・レイヤー設計 規約
+# パッケージ構成・レイヤー設計・MyBatis 規約
 
 ## 目次
 1. パッケージ構成
 2. レイヤーの責務と依存の向き
-3. Entity と Repository
-4. トランザクション
-5. DI とクラス設計
-6. 設定値
-7. ログ
-8. 命名規則
+3. Mapper と SQL
+4. Entity とテーブル
+5. トランザクション
+6. DI とクラス設計
+7. 設定値
+8. ログ
+9. 命名規則
+10. コメント
 
 ---
 
 ## 1. パッケージ構成
 
-**機能（ドメイン）単位でパッケージを切り、その中にレイヤーを置く**（package by feature）。
-層ごと（`controller/`、`service/` …）に切ると、1つの機能を直すために複数の遠いパッケージを行き来することになり、機能が増えるほど見通しが悪くなるため。
+**レイヤー単位でパッケージを切る**（package by layer）。
 
 ```
-src/main/java/com/example/app/
-├── Application.java
-├── common/                     全機能で共有するもの（ここに業務ロジックを置かない）
-│   ├── config/                 @Configuration、@ConfigurationProperties
-│   └── exception/              ErrorCode、BusinessException、GlobalExceptionHandler
-├── user/
-│   ├── UserController.java
-│   ├── UserService.java
-│   ├── UserRepository.java
-│   ├── User.java               Entity
-│   └── dto/
-│       ├── CreateUserRequest.java
-│       ├── UpdateUserRequest.java
-│       └── UserResponse.java
-└── order/
-    └── ...（user と同じ形）
+src/main/java/com/example/demo/
+├── DemoApplication.java
+├── controller/     @RestController（AdminDeliveryController など）
+├── service/        @Service（DeliveryService など）
+├── mapper/         MyBatis の @Mapper インターフェース（DeliveryMapper など）
+├── entity/         テーブル1行に対応するクラス（Delivery、User など）
+├── dto/            API の入出力の record（DeliveryResponse、PageResponse、ErrorResponse など）
+└── exception/      GlobalExceptionHandler、自作の例外クラス
+
+src/main/resources/
+├── application.properties
+├── schema.sql      テーブル定義（起動のたびに作り直す）
+└── data.sql        初期データ
 ```
 
-- 機能パッケージの中でさらに `controller/` `service/` のようなサブパッケージは作らない。ファイル数が10を超えて見通しが悪くなったら、`dto/` 以外に `domain/` などを切ることを検討する。
-- `common/` は「どの機能からも使われる技術的な部品」だけを置く場所。特定の機能の都合が入ったら、その機能のパッケージに戻す。
-- `util/` パッケージの乱立を避ける。staticメソッドの寄せ集めは、置き場所がない処理の逃げ場になりやすい。
+- 上記以外のパッケージを増やすときは、ユーザーに確認する。設定クラスが必要になったら `config/` を作る。
+- `util/` パッケージは作らない。staticメソッドの寄せ集めは、置き場所がない処理の逃げ場になりやすい。
 
 ## 2. レイヤーの責務と依存の向き
 
-依存は **Controller → Service → Repository** の一方向のみ。逆向き・飛び越しは禁止。
+依存は **Controller → Service → Mapper** の一方向のみ。逆向き・飛び越しは禁止。
 
 | レイヤー | やること | やらないこと |
 |---|---|---|
-| Controller | HTTP の受け取り、`@Valid`、Service 呼び出し、`ResponseEntity` 組み立て | 業務ロジック、try-catch、Repository の直接呼び出し、Entity の返却 |
-| Service | 業務ロジック、トランザクション境界、Entity ↔ DTO 変換の呼び出し、業務例外の送出 | HTTP の概念（`HttpServletRequest`、`ResponseStatusException`、`ResponseEntity`） |
-| Repository | 永続化（Spring Data JPA） | 業務判断 |
+| Controller | HTTP の受け取り、入力チェック（`@Valid`、`@Min` など）、Service 呼び出し、DTO を返す | 業務ロジック、try-catch、Mapper の直接呼び出し、Entity の返却 |
+| Service | 業務ロジック、Entity → DTO 変換の呼び出し、ページング計算、業務例外の送出、トランザクション境界 | HTTP の概念（`HttpServletRequest`、`ResponseEntity`、`ResponseStatusException`） |
+| Mapper | SQL の実行だけ | 業務判断 |
 
-- 他の機能のデータが必要な場合は、**相手の Service を呼ぶ**。相手の Repository を直接呼ばない（相手機能のルールを迂回してしまうため）。
-- Service 同士が循環参照しそうになったら、設計を見直す合図。共通部分を別の Service に切り出すか、どちらが主かを決める。
-- Service がインターフェース＋Impl の2点セットになっている必要はない。実装が1つしかないならクラスだけでよい（モックは Mockito でクラスに対して作れる）。
+- 管理者用とドライバー用で画面が違っても、同じテーブルを扱うなら Service・Mapper は共通にしてよい（例: `AdminDeliveryController` と `DriverDeliveryController` が両方 `DeliveryService` を使う）。Controller は利用者ごとに分ける。
+- 他のテーブルのデータが必要なとき、単純な参照なら SQL の JOIN で取る。業務ルールが絡むなら、そのテーブルを担当する Service を呼ぶ。
+- Service はインターフェース＋Impl の2点セットにしない。実装が1つならクラスだけでよい。
 
-## 3. Entity と Repository
+## 3. Mapper と SQL
 
-- Entity は `jakarta.persistence` のアノテーションを使う。
-- ID は `@GeneratedValue(strategy = GenerationType.IDENTITY)` の `Long` を基本とする。
-- 関連は **`FetchType.LAZY` を基本**にする（`@ManyToOne` はデフォルトが EAGER なので明示的に LAZY を付ける）。必要なところだけ `@EntityGraph` か JPQL の `join fetch` で取得し、N+1 を防ぐ。
-- 同時更新が起きうる Entity には `@Version` を付けて楽観ロックにする（競合時は 409 を返す。`rest-api.md` 参照）。
-- 作成日時・更新日時は `@CreationTimestamp` / `@UpdateTimestamp`、または JPA Auditing（`@CreatedDate` / `@LastModifiedDate`）で自動設定する。
-- Entity の setter は必要なものだけ。状態変更は意味のあるメソッド名にする（`order.cancel()` のように）。これにより「どこで状態が変わるか」を検索しやすくなる。
-- Entity に Lombok の `@Data` を付けない（`equals`/`hashCode`/`toString` が関連を辿って遅延ロード例外や無限ループを起こすため）。
-- Repository は `JpaRepository<Entity, Long>` を継承。クエリはまずメソッド名派生（`findByEmail`）、複雑なら `@Query`（JPQL）。ネイティブSQLは最後の手段。
-- `Open Session in View` は無効にする（`spring.jpa.open-in-view=false`）。有効だと Controller でうっかり遅延ロードが走り、どこでSQLが出ているか追えなくなるため。
-
-## 4. トランザクション
-
-- `@Transactional` は **Service のクラスに `@Transactional(readOnly = true)`**、更新系メソッドにだけ `@Transactional` を付ける。
-- Controller と Repository には付けない。
-- `org.springframework.transaction.annotation.Transactional` を使う（`jakarta.transaction.Transactional` と取り違えない）。
-- 同じクラス内のメソッド呼び出しには `@Transactional` が効かない（プロキシを経由しないため）。トランザクションを分けたい場合は別の Bean に切り出す。
-- トランザクション内で外部APIの呼び出しやメール送信などの遅い処理をしない（DBコネクションを長時間占有するため）。
-
-## 5. DI とクラス設計
-
-- **コンストラクタインジェクションのみ**。フィールドは `private final`。コンストラクタが1つならば `@Autowired` は不要。
-- Lombok を使っている場合は `@RequiredArgsConstructor` でよい。使っていない場合は手書きする。
-- `@Component` 系の Bean に可変の状態（フィールドの書き換え）を持たせない。Bean はシングルトンで、複数リクエストから同時に使われるため。
-- Java 17 の機能を積極的に使う: DTO は `record`、テキストブロック、`switch` 式、パターンマッチング `instanceof`。
-
-## 6. 設定値
-
-- 値は `application.yml`（または `.properties`）に置き、環境差分はプロファイル（`application-local.yml`、`application-prod.yml`）で分ける。
-- まとまった設定は `@Value` を散らばらせず、`@ConfigurationProperties` を付けた `record` で受ける。型安全でテストもしやすいため。
+MyBatis は **アノテーション方式**（`@Select` / `@Insert` / `@Update` / `@Delete`）で書く。XML マッパーは使わない。
 
 ```java
-@ConfigurationProperties(prefix = "app.mail")
-public record MailProperties(String from, Duration timeout) {}
+@Mapper
+public interface DeliveryMapper {
+
+  // 担当ドライバーの配送物をID順に、指定した件数だけ取得する
+  @Select("""
+      SELECT id, tracking_number, name, address, call_number, email, status, item_type,
+             driver_id, delivery_date, delivery_time, created_at, updated_at
+      FROM deliveries
+      WHERE driver_id = #{driverId}
+      ORDER BY id
+      LIMIT #{limit} OFFSET #{offset}
+      """)
+  List<Delivery> findByDriverId(
+      @Param("driverId") long driverId, @Param("limit") int limit, @Param("offset") int offset);
+
+  @Select("SELECT COUNT(*) FROM deliveries WHERE driver_id = #{driverId}")
+  long countByDriverId(@Param("driverId") long driverId);
+}
 ```
 
-（`@EnableConfigurationProperties(MailProperties.class)` または `@ConfigurationPropertiesScan` で有効化する）
+- **メソッド名と SQL の中身を一致させる。** `findByDriverId` なら `WHERE driver_id = #{driverId}` があり、引数に `driverId` がある。名前と中身がずれると、呼び出す側が誤解したまま使ってしまう。
+- **値は必ず `#{}` で渡す。`${}` は使わない。** `${}` は文字列をそのまま SQL に埋め込むため、SQLインジェクションの原因になる。並び替え項目を切り替えたいなどで `${}` が必要に見えたら、ユーザーに相談する。
+- 引数が2つ以上のときは、すべてに `@Param` を付け、SQL のプレースホルダと同じ名前にする。
+- 複数行の SQL はテキストブロック（`"""`）で書く。
+- `SELECT *` は使わず、カラムを列挙する。テーブルにカラムが増えたとき、意図しないデータまで取得してしまうため。
+- カラム名は `schema.sql` と一致させる。snake_case のカラムは `mybatis.configuration.map-underscore-to-camel-case=true` により Entity の camelCase フィールドに自動で対応する。SQL 側で `AS` を付ける必要はない。
+- **ページング**
+  - `LIMIT #{limit} OFFSET #{offset}` には必ず `ORDER BY` を付ける。付けないと、ページをまたいで同じ行が出たり、出ない行ができたりする。
+  - 一覧取得と件数取得（`count`）は対にし、**WHERE 条件を揃える**。揃っていないとページ数がずれる。
+  - offset の計算（`page * size`）は Service で行う。
+- 更新系
+  - `UPDATE` では `updated_at = now()` を必ず設定する（`schema.sql` のコメントの方針）。
+  - 更新・削除は戻り値を `int`（更新件数）にし、0件なら Service で「見つからない」として扱う。
+- メソッド名: 1件取得 `findById`、一覧 `findAll` / `findByXxx`、件数 `count` / `countByXxx`、追加 `insert`、更新 `update` / `updateXxx`、削除 `delete`。
+- 1件取得は戻り値を `Optional<Entity>` にしてよい。存在しない場合の判断は Service で行う。
 
-- パスワード・APIキーなどの秘密情報をリポジトリにコミットしない。環境変数から `${DB_PASSWORD}` のように受ける。
+## 4. Entity とテーブル
 
-## 7. ログ
+- Entity はテーブル1行に対応する普通のクラス（getter / setter）。JPA のアノテーションは付けない。
+- Lombok は使っていない。getter / setter は手書きする（IDE の自動生成でよい）。
+- フィールドの型
+  - `BIGSERIAL` / `BIGINT` → `Long`（NULL がありうるため、`driverId` などの外部キーもラッパー型）
+  - `VARCHAR` → `String`
+  - `DATE` → `LocalDate`、`TIMESTAMP` → `LocalDateTime`
+- `status` や `item_type` のように値が決まっているカラムは、`schema.sql` の `CHECK` 制約が正。アプリ側で値を増やすときは `schema.sql` も一緒に変える。
+- テーブルを変えたら、`schema.sql`・`data.sql`・Entity・関係する Mapper の SQL をまとめて直す。
+- `users.password_hash` のような機密項目は、Entity には持ってよいが、DTO には絶対に入れない。
 
-- SLF4J を使う（`LoggerFactory.getLogger(Xxx.class)`、Lombok があれば `@Slf4j`）。`System.out.println` は使わない。
-- 文字列連結ではなくプレースホルダを使う: `log.info("user created: id={}", id)`。
-- レベルの目安: `ERROR` = 対応が必要な異常（5xx）、`WARN` = 想定内だが注意すべき事象（4xx、リトライ）、`INFO` = 業務上の主要イベント、`DEBUG` = 開発時の詳細。
-- 個人情報（メールアドレス、氏名、トークン、パスワード）をログに出さない。出す必要があるときは ID で代替する。
+## 5. トランザクション
 
-## 8. 命名規則
+- 参照だけの Service メソッドには付けなくてよい（現状の `DeliveryService.findAll` のとおり）。
+- **更新系（INSERT / UPDATE / DELETE を呼ぶ）の Service メソッドには `@Transactional` を付ける。** 複数の SQL を実行する途中で失敗したとき、全部取り消すため。
+- `org.springframework.transaction.annotation.Transactional` を使う（`jakarta.transaction.Transactional` と取り違えない）。
+- Controller と Mapper には付けない。
+- 同じクラス内のメソッド呼び出しには `@Transactional` が効かない（プロキシを経由しないため）。
+
+## 6. DI とクラス設計
+
+- **コンストラクタインジェクションのみ**。フィールドは `private final`。コンストラクタが1つなら `@Autowired` は不要。
+
+```java
+private final DeliveryService deliveryService;
+
+public AdminDeliveryController(DeliveryService deliveryService) {
+  this.deliveryService = deliveryService;
+}
+```
+
+- `@Service` などの Bean に可変の状態（フィールドの書き換え）を持たせない。Bean は1つのインスタンスを複数リクエストで同時に使うため。
+- Java 17 の機能を使う: DTO は `record`、SQL はテキストブロック、`switch` 式。
+- インデントはスペース2つ（既存コードに合わせる）。
+
+## 7. 設定値
+
+- 設定は `application.properties` に書く。
+- DB のパスワードなどの秘密情報をリポジトリにコミットしない。環境変数から `${DB_PASSWORD}` のように受ける。
+- `spring.sql.init.mode=always` により、起動のたびに `schema.sql` でテーブルを作り直し、`data.sql` を流す。開発用の設定なので、本番相当の環境では変える必要がある。
+
+## 8. ログ
+
+- SLF4J を使う（`private static final Logger log = LoggerFactory.getLogger(Xxx.class);`）。`System.out.println` は使わない。
+- 文字列連結ではなくプレースホルダを使う: `log.info("配送状況を更新しました: id={}", id)`。
+- レベルの目安: `ERROR` = 想定外の異常（500）、`WARN` = 想定内だが注意すべき事象、`INFO` = 業務上の主要イベント、`DEBUG` = 開発時の詳細。
+- **個人情報をログに出さない。** 配送先の氏名・住所・電話番号・メールアドレス、パスワードは出さず、ID や伝票番号で代わりにする。
+
+## 9. 命名規則
 
 | 種類 | 規則 | 例 |
 |---|---|---|
-| Controller | `{機能}Controller` | `UserController` |
-| Service | `{機能}Service` | `UserService` |
-| Repository | `{Entity}Repository` | `UserRepository` |
-| リクエストDTO | `{動詞}{機能}Request` | `CreateUserRequest` |
-| レスポンスDTO | `{機能}Response` | `UserResponse` |
+| Controller | `{利用者}{機能}Controller` | `AdminDeliveryController`、`DriverDeliveryController` |
+| Service | `{機能}Service` | `DeliveryService` |
+| Mapper | `{Entity}Mapper` | `DeliveryMapper` |
+| Entity | テーブル名の単数形・PascalCase | `deliveries` → `Delivery` |
+| リクエストDTO | `{動詞}{機能}Request` | `UpdateDeliveryStatusRequest` |
+| レスポンスDTO | `{機能}Response` | `DeliveryResponse` |
 | 例外 | `{内容}Exception` | `ResourceNotFoundException` |
-| 設定 | `{対象}Config` / `{対象}Properties` | `SecurityConfig` / `MailProperties` |
-| テスト | `{対象クラス}Test`（結合テストは `{対象}IT`） | `UserServiceTest` / `UserApiIT` |
+| テスト | `{対象クラス}Test` | `DeliveryServiceTest` |
 
-- メソッド名: 取得は `find`（なければ例外を投げる場合も `findById` で統一し、`Optional` を返すのは Repository のみ）、作成 `create`、更新 `update`、削除 `delete`。
+- メソッド名は lowerCamelCase。`findBy` の `B` のように、単語の区切りは必ず大文字にする（`findbyDriverId` ではなく `findByDriverId`）。
 - 定数は `UPPER_SNAKE_CASE`、パッケージ名はすべて小文字。
+
+## 10. コメント
+
+- コメントは日本語で書く。
+- メソッドの上に「何をするか」を1行で書く（既存の Mapper・Service のとおり）。
+- 計算や条件が分かりにくい行には、具体例を添える（例: `// 例: page=2, size=10 なら21件目から（20件飛ばす）`）。
+- コードを読めば分かること（`// getterです` など）は書かない。

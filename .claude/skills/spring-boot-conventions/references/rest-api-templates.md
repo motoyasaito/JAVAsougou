@@ -1,423 +1,249 @@
 # コード雛形
 
-パッケージ名 `com.example.app` は実プロジェクトのものに置き換えること。
-ここに示す構成は以下を想定している。
-
-```
-com.example.app
-├── common/exception/   ErrorCode, BusinessException とその派生, GlobalExceptionHandler
-└── user/               UserController, UserService, UserRepository, User(Entity), dto/
-```
+既存コードと同じ形で新しい機能を書くための雛形。
+例として「ドライバーが配送状況を更新する（`PATCH /api/driver/deliveries/{id}/status`）」機能を使う。
 
 ## 目次
 1. pom.xml の依存関係
-2. ErrorCode
-3. 例外クラス
-4. GlobalExceptionHandler
-5. DTO（record）
+2. Mapper
+3. DTO（record）
+4. Service
+5. 例外クラスと GlobalExceptionHandler への追加
 6. Controller
-7. Service
-8. Controller テスト
+7. Controller テスト
 
 ---
 
 ## 1. pom.xml の依存関係
 
-```xml
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-web</artifactId>
-</dependency>
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-validation</artifactId>
-</dependency>
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-test</artifactId>
-    <scope>test</scope>
-</dependency>
-```
+すでに入っているもの。新しく追加するときはユーザーに確認する。
+
+| 依存 | 用途 |
+|---|---|
+| `spring-boot-starter-webmvc` | REST API |
+| `spring-boot-starter-validation` | 入力チェック |
+| `spring-boot-starter-jdbc` / `postgresql` | DB 接続 |
+| `mybatis-spring-boot-starter` | MyBatis |
+| `spring-boot-starter-webmvc-test` など `*-test` | テスト |
 
 `application.properties`:
 
 ```properties
-spring.mvc.problemdetails.enabled=true
+mybatis.configuration.map-underscore-to-camel-case=true
 ```
 
-## 2. ErrorCode
+## 2. Mapper
 
 ```java
-package com.example.app.common.exception;
+package com.example.demo.mapper;
 
-import org.springframework.http.HttpStatus;
+// 既存の DeliveryMapper に追加する
 
-public enum ErrorCode {
-    VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "Validation Failed"),
-    MALFORMED_REQUEST(HttpStatus.BAD_REQUEST, "Malformed Request"),
-    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Unauthorized"),
-    FORBIDDEN(HttpStatus.FORBIDDEN, "Forbidden"),
-    RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "Resource Not Found"),
-    DUPLICATE_RESOURCE(HttpStatus.CONFLICT, "Duplicate Resource"),
-    OPTIMISTIC_LOCK_CONFLICT(HttpStatus.CONFLICT, "Conflict"),
-    BUSINESS_RULE_VIOLATION(HttpStatus.UNPROCESSABLE_ENTITY, "Business Rule Violation"),
-    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
+  // 配送物を1件取得する
+  @Select("""
+      SELECT id, tracking_number, name, address, call_number, email, status, item_type,
+             driver_id, delivery_date, delivery_time, created_at, updated_at
+      FROM deliveries
+      WHERE id = #{id}
+      """)
+  Optional<Delivery> findById(@Param("id") long id);
 
-    private final HttpStatus status;
-    private final String title;
-
-    ErrorCode(HttpStatus status, String title) {
-        this.status = status;
-        this.title = title;
-    }
-
-    public HttpStatus status() { return status; }
-    public String title() { return title; }
-}
+  // 配送状況を更新する。戻り値は更新した件数（0なら該当なし）
+  @Update("""
+      UPDATE deliveries
+      SET status = #{status}, updated_at = now()
+      WHERE id = #{id}
+      """)
+  int updateStatus(@Param("id") long id, @Param("status") String status);
 ```
 
-## 3. 例外クラス
+## 3. DTO（record）
+
+リクエスト:
 
 ```java
-package com.example.app.common.exception;
+package com.example.demo.dto;
 
-public class BusinessException extends RuntimeException {
-    private final ErrorCode errorCode;
-
-    public BusinessException(ErrorCode errorCode, String message) {
-        super(message);
-        this.errorCode = errorCode;
-    }
-
-    public ErrorCode getErrorCode() { return errorCode; }
-}
-```
-
-```java
-package com.example.app.common.exception;
-
-public class ResourceNotFoundException extends BusinessException {
-    public ResourceNotFoundException(String resourceName, Object id) {
-        super(ErrorCode.RESOURCE_NOT_FOUND,
-              "%sが見つかりません（id=%s）".formatted(resourceName, id));
-    }
-}
-```
-
-```java
-package com.example.app.common.exception;
-
-public class ConflictException extends BusinessException {
-    public ConflictException(String message) {
-        super(ErrorCode.DUPLICATE_RESOURCE, message);
-    }
-}
-```
-
-```java
-package com.example.app.common.exception;
-
-public class BusinessRuleViolationException extends BusinessException {
-    public BusinessRuleViolationException(String message) {
-        super(ErrorCode.BUSINESS_RULE_VIOLATION, message);
-    }
-}
-```
-
-## 4. GlobalExceptionHandler
-
-```java
-package com.example.app.common.exception;
-
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.ConstraintViolationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.ProblemDetail;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.context.request.ServletWebRequest;
-import org.springframework.web.context.request.WebRequest;
-import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
-
-import java.net.URI;
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Map;
-
-@RestControllerAdvice
-public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
-
-    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
-
-    // ---- 業務例外 ----
-    @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ProblemDetail> handleBusiness(BusinessException ex, HttpServletRequest req) {
-        log.warn("[{}] {}", ex.getErrorCode(), ex.getMessage());
-        return build(ex.getErrorCode(), ex.getMessage(), req.getRequestURI(), null);
-    }
-
-    // ---- パス・クエリパラメータの検証（@Validated） ----
-    @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ProblemDetail> handleConstraintViolation(ConstraintViolationException ex,
-                                                                   HttpServletRequest req) {
-        List<Map<String, String>> errors = ex.getConstraintViolations().stream()
-                .map(v -> Map.of(
-                        "field", lastNode(v.getPropertyPath().toString()),
-                        "message", v.getMessage()))
-                .toList();
-        log.warn("[{}] {}", ErrorCode.VALIDATION_ERROR, errors);
-        return build(ErrorCode.VALIDATION_ERROR, "入力内容に誤りがあります", req.getRequestURI(), errors);
-    }
-
-    // ---- 楽観ロック ----
-    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
-    public ResponseEntity<ProblemDetail> handleOptimisticLock(ObjectOptimisticLockingFailureException ex,
-                                                              HttpServletRequest req) {
-        log.warn("[{}] {}", ErrorCode.OPTIMISTIC_LOCK_CONFLICT, ex.getMessage());
-        return build(ErrorCode.OPTIMISTIC_LOCK_CONFLICT,
-                "他のユーザーによって更新されています。再読み込みしてからやり直してください",
-                req.getRequestURI(), null);
-    }
-
-    // ---- 想定外（最後の砦）：内部情報は返さない ----
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ProblemDetail> handleUnexpected(Exception ex, HttpServletRequest req) {
-        log.error("Unexpected error at {}", req.getRequestURI(), ex);
-        return build(ErrorCode.INTERNAL_ERROR, "サーバー内部でエラーが発生しました", req.getRequestURI(), null);
-    }
-
-    // ---- @Valid @RequestBody の検証エラー ----
-    @Override
-    protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
-                                                                  HttpHeaders headers,
-                                                                  HttpStatusCode status,
-                                                                  WebRequest request) {
-        List<Map<String, String>> errors = ex.getBindingResult().getFieldErrors().stream()
-                .map(fe -> Map.of(
-                        "field", fe.getField(),
-                        "message", fe.getDefaultMessage() == null ? "不正な値です" : fe.getDefaultMessage()))
-                .toList();
-        log.warn("[{}] {}", ErrorCode.VALIDATION_ERROR, errors);
-        return asObject(build(ErrorCode.VALIDATION_ERROR, "入力内容に誤りがあります", path(request), errors));
-    }
-
-    // ---- JSON が壊れている・型が合わない ----
-    @Override
-    protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
-                                                                  HttpHeaders headers,
-                                                                  HttpStatusCode status,
-                                                                  WebRequest request) {
-        log.warn("[{}] {}", ErrorCode.MALFORMED_REQUEST, ex.getMostSpecificCause().getMessage());
-        return asObject(build(ErrorCode.MALFORMED_REQUEST,
-                "リクエストの形式が正しくありません", path(request), null));
-    }
-
-    // ---- 共通の組み立て ----
-    private ResponseEntity<ProblemDetail> build(ErrorCode code, String detail, String path,
-                                                List<Map<String, String>> errors) {
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(code.status(), detail);
-        pd.setTitle(code.title());
-        pd.setInstance(URI.create(path));
-        pd.setProperty("code", code.name());
-        pd.setProperty("timestamp", OffsetDateTime.now());
-        if (errors != null) {
-            pd.setProperty("errors", errors);
-        }
-        return ResponseEntity.status(code.status()).body(pd);
-    }
-
-    private static ResponseEntity<Object> asObject(ResponseEntity<ProblemDetail> res) {
-        return ResponseEntity.status(res.getStatusCode()).body(res.getBody());
-    }
-
-    private static String path(WebRequest request) {
-        return (request instanceof ServletWebRequest swr) ? swr.getRequest().getRequestURI() : "";
-    }
-
-    private static String lastNode(String propertyPath) {
-        int i = propertyPath.lastIndexOf('.');
-        return i >= 0 ? propertyPath.substring(i + 1) : propertyPath;
-    }
-}
-```
-
-補足: `ResponseEntityExceptionHandler` が処理する他の標準例外（405 Method Not Allowed、415 Unsupported Media Type など）は、Spring が自動的に ProblemDetail 形式で返す。それらにも `code` を付けたい場合は `createResponseEntity` をオーバーライドして拡張プロパティを足す。
-
-## 5. DTO（record）
-
-```java
-package com.example.app.user.dto;
-
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 
-public record CreateUserRequest(
-        @NotBlank(message = "名前は必須です")
-        @Size(max = 50, message = "名前は50文字以内で入力してください")
-        String name,
-
-        @NotBlank(message = "メールアドレスは必須です")
-        @Email(message = "メールアドレスの形式が正しくありません")
-        String email
-) {}
+// 配送状況の更新で受け取る形
+public record UpdateDeliveryStatusRequest(
+    @NotBlank(message = "配送状況を指定してください")
+    @Pattern(regexp = "PREPARING|IN TRANSIT|DELIVERED|ABSENT", message = "配送状況の値が正しくありません")
+    String status) {
+}
 ```
 
+レスポンスは既存の `DeliveryResponse`（`from` で Entity から変換）と、一覧なら `PageResponse<T>` を使う。
+
+## 4. Service
+
 ```java
-package com.example.app.user.dto;
+package com.example.demo.service;
 
-import com.example.app.user.User;
-import java.time.OffsetDateTime;
+// 既存の DeliveryService に追加する
 
-public record UserResponse(Long id, String name, String email, OffsetDateTime createdAt) {
-    public static UserResponse from(User user) {
-        return new UserResponse(user.getId(), user.getName(), user.getEmail(), user.getCreatedAt());
+  // 配送状況を更新して、更新後の配送物を返す
+  @Transactional
+  public DeliveryResponse updateStatus(long id, String status) {
+    int updated = deliveryMapper.updateStatus(id, status);
+    if (updated == 0) {
+      throw new ResourceNotFoundException("指定した配送物は存在しません");
     }
+    Delivery delivery = deliveryMapper.findById(id)
+        .orElseThrow(() -> new ResourceNotFoundException("指定した配送物は存在しません"));
+    return DeliveryResponse.from(delivery);
+  }
+```
+
+- `@Transactional` は `org.springframework.transaction.annotation.Transactional`。
+- 見つからないときは `null` を返さず、例外を投げる。
+
+## 5. 例外クラスと GlobalExceptionHandler への追加
+
+例外クラス（`exception/` に置く）:
+
+```java
+package com.example.demo.exception;
+
+// 指定したIDのデータが存在しないときに投げる（404になる）
+public class ResourceNotFoundException extends RuntimeException {
+  public ResourceNotFoundException(String message) {
+    super(message);
+  }
 }
+```
+
+`GlobalExceptionHandler` に追加するハンドラ。最後の `Exception` ハンドラより上に書く:
+
+```java
+  // 自作の例外: データが存在しない
+  @ExceptionHandler(ResourceNotFoundException.class)
+  public ResponseEntity<ErrorResponse> handleResourceNotFound(ResourceNotFoundException e) {
+    return build(HttpStatus.NOT_FOUND, e.getMessage(), List.of());
+  }
+
+  // パス・クエリパラメータの入力チェック（@Min・@Max など）に引っかかった時
+  @ExceptionHandler(HandlerMethodValidationException.class)
+  public ResponseEntity<ErrorResponse> handleMethodValidation(HandlerMethodValidationException e) {
+    List<String> details = e.getParameterValidationResults().stream()
+        .flatMap(r -> r.getResolvableErrors().stream()
+            .map(err -> r.getMethodParameter().getParameterName() + ":" + err.getDefaultMessage()))
+        .toList();
+    return build(HttpStatus.BAD_REQUEST, "入力内容に誤りがあります", details);
+  }
+
+  // ?page=abc のように、パラメータの型が違う時
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+    return build(HttpStatus.BAD_REQUEST, "入力内容に誤りがあります", List.of(e.getName() + ":値の形式が正しくありません"));
+  }
+```
+
+import:
+
+```java
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 ```
 
 ## 6. Controller
 
 ```java
-package com.example.app.user;
+package com.example.demo.controller;
 
-import com.example.app.user.dto.CreateUserRequest;
-import com.example.app.user.dto.UserResponse;
+import com.example.demo.dto.DeliveryResponse;
+import com.example.demo.dto.UpdateDeliveryStatusRequest;
+import com.example.demo.service.DeliveryService;
 import jakarta.validation.Valid;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
-
-import java.net.URI;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/users")
-public class UserController {
+@RequestMapping("/api/driver/deliveries")
+public class DriverDeliveryController {
 
-    private final UserService userService;
+  private final DeliveryService deliveryService;
 
-    public UserController(UserService userService) {
-        this.userService = userService;
-    }
+  public DriverDeliveryController(DeliveryService deliveryService) {
+    this.deliveryService = deliveryService;
+  }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<UserResponse> get(@PathVariable Long id) {
-        return ResponseEntity.ok(userService.findById(id));
-    }
-
-    @PostMapping
-    public ResponseEntity<UserResponse> create(@Valid @RequestBody CreateUserRequest request) {
-        UserResponse created = userService.create(request);
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
-                .path("/{id}").buildAndExpand(created.id()).toUri();
-        return ResponseEntity.created(location).body(created);
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        userService.delete(id);
-        return ResponseEntity.noContent().build();
-    }
+  // 配送状況を更新する
+  @PatchMapping("/{id}/status")
+  public DeliveryResponse updateStatus(
+      @PathVariable long id,
+      @Valid @RequestBody UpdateDeliveryStatusRequest request) {
+    return deliveryService.updateStatus(id, request.status());
+  }
 }
 ```
 
-## 7. Service
+- 200 で返すので `ResponseEntity` で包まず、DTO をそのまま返す。
+- 作成（201）のときだけ `ResponseEntity.status(HttpStatus.CREATED).body(...)`、削除（204）のときは `ResponseEntity.noContent().build()` を使う。
+
+## 7. Controller テスト
 
 ```java
-package com.example.app.user;
+package com.example.demo.controller;
 
-import com.example.app.common.exception.ConflictException;
-import com.example.app.common.exception.ResourceNotFoundException;
-import com.example.app.user.dto.CreateUserRequest;
-import com.example.app.user.dto.UserResponse;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Service
-@Transactional(readOnly = true)
-public class UserService {
-
-    private final UserRepository userRepository;
-
-    public UserService(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
-
-    public UserResponse findById(Long id) {
-        return userRepository.findById(id)
-                .map(UserResponse::from)
-                .orElseThrow(() -> new ResourceNotFoundException("ユーザー", id));
-    }
-
-    @Transactional
-    public UserResponse create(CreateUserRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
-            throw new ConflictException("このメールアドレスは既に登録されています");
-        }
-        User saved = userRepository.save(new User(request.name(), request.email()));
-        return UserResponse.from(saved);
-    }
-
-    @Transactional
-    public void delete(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new ResourceNotFoundException("ユーザー", id);
-        }
-        userRepository.deleteById(id);
-    }
-}
-```
-
-## 8. Controller テスト
-
-```java
-package com.example.app.user;
-
-import com.example.app.common.exception.ResourceNotFoundException;
+import com.example.demo.exception.ResourceNotFoundException;
+import com.example.demo.service.DeliveryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean; // 3.3以前は @MockBean
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+@WebMvcTest(DriverDeliveryController.class)
+class DriverDeliveryControllerTest {
 
-@WebMvcTest(UserController.class)
-class UserControllerTest {
+  @Autowired
+  MockMvc mockMvc;
 
-    @Autowired MockMvc mockMvc;
-    @MockitoBean UserService userService;
+  @MockitoBean
+  DeliveryService deliveryService;
 
-    @Test
-    void 存在しないIDは404とRESOURCE_NOT_FOUNDを返す() throws Exception {
-        when(userService.findById(999L)).thenThrow(new ResourceNotFoundException("ユーザー", 999L));
+  @Test
+  void 配送状況が不正な値なら400を返す() throws Exception {
+    mockMvc.perform(patch("/api/driver/deliveries/1/status")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"status": "UNKNOWN"}
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.details[0]").value(org.hamcrest.Matchers.startsWith("status:")));
+  }
 
-        mockMvc.perform(get("/api/v1/users/999"))
-                .andExpect(status().isNotFound())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
-    }
+  @Test
+  void 存在しない配送物なら404を返す() throws Exception {
+    // Given
+    when(deliveryService.updateStatus(anyLong(), anyString()))
+        .thenThrow(new ResourceNotFoundException("指定した配送物は存在しません"));
 
-    @Test
-    void メール形式が不正なら400とerrorsを返す() throws Exception {
-        mockMvc.perform(post("/api/v1/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"name":"山田太郎","email":"not-an-email"}
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.errors[0].field").value("email"));
-    }
+    // When / Then
+    mockMvc.perform(patch("/api/driver/deliveries/999/status")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"status": "DELIVERED"}
+                """))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.status").value(404));
+  }
 }
 ```
+
+- Spring Boot 4 では `@WebMvcTest` のパッケージが `org.springframework.boot.webmvc.test.autoconfigure` に変わっている（Boot 3 の `org.springframework.boot.test.autoconfigure.web.servlet` ではない）。
