@@ -56,10 +56,11 @@ public class GlobalExceptionHandler {
     return build(HttpStatus.BAD_REQUEST, "必須パラメータがありません", List.of(e.getParameterName() + ":パラメータがありません"));
   }
 
+  // @RequestParamに直接付けた@Min・@Maxなどの入力チェックに引っかかったとき（例: size=0、page=-1)
   @ExceptionHandler(HandlerMethodValidationException.class)
   public ResponseEntity<ErrorResponse> handleParameterValidation(HandlerMethodValidationException e) {
-    List<String> details = e.getParameterValidationResults().stream()
-        .flatMap(result -> result.getResolvableErrors().stream()
+    List<String> details = e.getParameterValidationResults().stream()// 引っかかったパラメータごとの結果の一覧(sizaとpage両方だめなら2つ)
+        .flatMap(result -> result.getResolvableErrors().stream()// 1つのパラメータに複数のエラーがあり得るので、全部を1本の一覧にまとめる
             .map(error -> result.getMethodParameter().getParameterName() + ":" + error.getDefaultMessage()))
         .toList();
     return build(HttpStatus.BAD_REQUEST, "入力内容に誤りがあります", details);
