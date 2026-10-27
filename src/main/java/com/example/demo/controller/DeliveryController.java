@@ -22,6 +22,7 @@ public class DeliveryController {
     this.deliveryService = deliveryService;
   }
 
+  // TODO: ログイン機能ができたら、driverId はリクエストで受け取らず、ログイン中のドライバーの ID を使う（認証処理は別チケットで対応）
   @GetMapping
   public PageResponse<DeliveryResponse> findByDriver(
       @RequestParam @Min(1) long driverId,

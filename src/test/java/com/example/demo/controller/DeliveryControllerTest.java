@@ -38,8 +38,8 @@ class DeliveryControllerTest {
 
     // When / Then
     mockMvc.perform(get("/api/deliveries")
-            .param("driverId", "1")
-            .param("date", "2026-10-26"))
+        .param("driverId", "1")
+        .param("date", "2026-10-26"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].trackingNumber").value("123456789012"))
         .andExpect(jsonPath("$.content[0].deliveryDate").value("2026-10-26"))
@@ -71,8 +71,8 @@ class DeliveryControllerTest {
 
     // When / Then
     mockMvc.perform(get("/api/deliveries")
-            .param("driverId", "1")
-            .param("size", "100"))
+        .param("driverId", "1")
+        .param("size", "100"))
         .andExpect(status().isOk());
   }
 
@@ -91,10 +91,17 @@ class DeliveryControllerTest {
   }
 
   @Test
+  void ドライバーIDが0の場合400を返す() throws Exception {
+    mockMvc.perform(get("/api/deliveries").param("driverId", "0"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400));
+  }
+
+  @Test
   void 日付の形式が正しくなければ400を返す() throws Exception {
     mockMvc.perform(get("/api/deliveries")
-            .param("driverId", "1")
-            .param("date", "2026/10/26"))
+        .param("driverId", "1")
+        .param("date", "2026/10/26"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.status").value(400));
   }
@@ -102,8 +109,8 @@ class DeliveryControllerTest {
   @Test
   void sizeが0なら400を返す() throws Exception {
     mockMvc.perform(get("/api/deliveries")
-            .param("driverId", "1")
-            .param("size", "0"))
+        .param("driverId", "1")
+        .param("size", "0"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.status").value(400));
   }
@@ -111,8 +118,8 @@ class DeliveryControllerTest {
   @Test
   void sizeが101なら400を返す() throws Exception {
     mockMvc.perform(get("/api/deliveries")
-            .param("driverId", "1")
-            .param("size", "101"))
+        .param("driverId", "1")
+        .param("size", "101"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.status").value(400));
   }
@@ -120,8 +127,8 @@ class DeliveryControllerTest {
   @Test
   void pageが負の数なら400を返す() throws Exception {
     mockMvc.perform(get("/api/deliveries")
-            .param("driverId", "1")
-            .param("page", "-1"))
+        .param("driverId", "1")
+        .param("page", "-1"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.status").value(400));
   }

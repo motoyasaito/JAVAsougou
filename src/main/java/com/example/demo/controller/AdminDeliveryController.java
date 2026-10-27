@@ -29,6 +29,7 @@ public class AdminDeliveryController {
   }
 
   // 配送物の一覧を取得する
+  // TODO:認証処理に関しては別チケットで対応（ログインユーザーのロールを確認し、管理者のみ呼べるようにする）
   @GetMapping // GET /api/admin/deliveries で呼ばれる
   public PageResponse<DeliveryResponse> findAll(
       @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size, // URLの ?size= を受け取る。省略したら10。1〜100以外は400になる
@@ -37,6 +38,7 @@ public class AdminDeliveryController {
   }
 
   // 配送物を登録する。登録出来たら201と登録した内容を返す
+  // TODO:認証処理に関しては別チケットで対応（管理者のみ登録できるようにする）
   @PostMapping // POST /api/admin/deliveries で呼ばれる
   // @RequestBody：リクエストの本文（JSON）をCreateDeliveryRequestに変換して受け取る
   // @Valid：CreateDeliveryRequestに付けた入力チェック（@NotBlankなど）を実行する。引っかかったら400になる
