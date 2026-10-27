@@ -10,12 +10,12 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface DeliveryMapper {
 
-  // 配送物をID順に、指定した件数（limit）だけ、指定した位置（offset）から取得する
+  // 配送物を日付順に、指定した件数（limit）だけ、指定した位置（offset）から取得する
   @Select("""
       SELECT id, tracking_number, name, address, call_number, email, status, item_type,
              driver_id, delivery_date, delivery_time, created_at, updated_at
       FROM deliveries
-      ORDER BY id
+      ORDER BY delivery_date, id
       LIMIT #{limit} OFFSET #{offset}
       """)
   List<Delivery> findAll(@Param("limit") int limit, @Param("offset") long offset);
