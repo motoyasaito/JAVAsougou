@@ -20,6 +20,8 @@ public class AdminDeliveryController {
     this.deliveryService = deliveryService;
   }
 
+  // ログインユーザーのロールを確認し、管理者のみ呼べるようにする。
+  // TODO:認証処理に関しては別チケットで対応
   @GetMapping
   public PageResponse<DeliveryResponse> findAll(
       @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
