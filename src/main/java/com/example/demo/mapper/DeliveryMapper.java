@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface DeliveryMapper {
@@ -65,4 +66,21 @@ public interface DeliveryMapper {
       """)
   @Options(useGeneratedKeys = true, keyProperty = "id")
   int insert(Delivery delivery);
+
+  // 伝票番号で配送物を1件取得する
+  @Select("""
+      SELECT id, tracking_number, name, address, call_number, email, status, item_type,
+             driver_id, delivery_date, delivery_time, created_at, updated_at
+      FROM deliveries
+      WHERE tracking_number = #{trackingNumber}
+      """)
+  Optional<Delivery> findByTrackingNumber(@Param("trackingNumber") String trackingNumber);
+
+  // idで配送物のステータスを変更する
+  @Update("""
+      UPDATE deliveries
+      SET status = #{status}, updated_at = now()
+      WHERE id = #{id}
+      """)
+  int updateStatus(@Param("id") long id, @Param("status") String status);
 }
