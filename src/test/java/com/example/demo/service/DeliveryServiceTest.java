@@ -1,6 +1,7 @@
 package com.example.demo.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.ArgumentCaptor;
@@ -10,6 +11,7 @@ import com.example.demo.dto.CreateDeliveryRequest;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.entity.Delivery;
+import com.example.demo.exception.NotFoundException;
 import com.example.demo.mapper.DeliveryMapper;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -215,6 +217,37 @@ class DeliveryServiceTest {
     ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
     verify(deliveryMapper).insert(captor.capture());
     assertThat(captor.getValue().getTrackingNumber()).isEqualTo("222222222222");// 使用済みの1回目ではなく、2回目の番号でinsertされているか
+  }
+
+  // ---------- 配送物の詳細（findByTrackingNumber） ----------
+
+  @Test
+  void 詳細_伝票番号で配送物を取得してDTOに変換して返す() {
+    // Given マッパーが返すデータを1件作り、「この伝票番号で呼ばれたら、箱（Optional）に入れて返す」と教える
+    Delivery delivery = new Delivery();// DBから読んだふりをするための、空の入れ物（1行分）を作る
+    delivery.setId(1L);// 確かめたい項目だけ値を入れる。idは1
+    delivery.setTrackingNumber("123456789012");// 伝票番号
+    delivery.setName("山田太郎");// お届け先の氏名
+    when(deliveryMapper.findByTrackingNumber("123456789012")).thenReturn(Optional.of(delivery));// この番号で呼ばれたら、上のdeliveryを箱（Optional）に入れて返すと教える
+
+    // When
+    DeliveryResponse result = deliveryService.findByTrackingNumber("123456789012");// 本物のServiceで詳細を取得する
+
+    // Then DTOに変換されて、中身が引き継がれているか確かめる
+    assertThat(result.id()).isEqualTo(1L);// idが引き継がれているか
+    assertThat(result.trackingNumber()).isEqualTo("123456789012");// 伝票番号が引き継がれているか
+    assertThat(result.name()).isEqualTo("山田太郎");// 氏名が引き継がれているか
+  }
+
+  @Test
+  void 詳細_伝票番号が見つからなければ404の例外を投げる() {
+    // Given 「この伝票番号で呼ばれたら、空の箱を返す」と教える（DBに該当データがない状態）
+    when(deliveryMapper.findByTrackingNumber("999999999999")).thenReturn(Optional.empty());// Optional.empty()は中身がない箱。これでServiceのorElseThrowが例外を投げる道に進む
+
+    // When / Then assertThatThrownByの中で呼んだ処理が、NotFoundExceptionを投げるか確かめる
+    assertThatThrownBy(() -> deliveryService.findByTrackingNumber("999999999999"))// () ->で処理を包んで渡すと、例外が出てもテストが止まらず、投げられた例外を調べられる
+        .isInstanceOf(NotFoundException.class)// 投げられた例外がNotFoundExceptionか確かめる
+        .hasMessage("該当する配送物が見つかりません");// メッセージも確かめる。GlobalExceptionHandlerがこの文字をレスポンスに入れるため
   }
 
   // テストで使う登録リクエストを作る（2つのテストで同じものを使うのでメソッドにまとめる）

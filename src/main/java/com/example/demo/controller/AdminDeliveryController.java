@@ -8,10 +8,12 @@ import com.example.demo.service.DeliveryService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import java.net.URI;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -47,5 +49,15 @@ public class AdminDeliveryController {
     DeliveryResponse created = deliveryService.create(request);// Serviceに登録を任せて、登録した内容を受け取る
     URI location = URI.create("/api/admin/deliveries/" + created.trackingNumber());// 登録したデータの場所（例:/api/admin/deliveries/123456789012）を作る。詳細APIは伝票番号で取得するため
     return ResponseEntity.created(location).body(created);// created()でステータス201とLocationヘッダーを付け、body()で本文に登録した内容を入れて返す
+  }
+
+  // 伝票番号で配送物の詳細を取得する
+  // TODO:認証処理に関しては別チケットで対応（管理者のみ呼べるようにする）
+  @GetMapping("/{trackingNumber}") // GET /api/admin/deliveries/123456789012 のように、URLの最後に伝票番号を付けて呼ばれる
+  // @PathVariable：URLの {trackingNumber} の部分を、同じ名前の引数で受け取る
+  // @Pattern：12桁の数字でなければ400になる（一覧の@Min・@Maxと同じく、引数に直接付けられる）
+  public DeliveryResponse findByTrackingNumber(
+      @PathVariable @Pattern(regexp = "^[0-9]{12}$", message = "伝票番号は12桁の数字で入力してください") String trackingNumber) {
+    return deliveryService.findByTrackingNumber(trackingNumber);// Serviceに取得を任せて、結果をそのまま返す（ステータスは自動で200）
   }
 }
