@@ -66,6 +66,23 @@ public class GlobalExceptionHandler {
     return build(HttpStatus.BAD_REQUEST, "入力内容に誤りがあります", details);
   }
 
+  // データが見つからないとき（例：伝票番号に該当する配送物がない）
+  @ExceptionHandler(NotFoundException.class) // NotFoundExceptionが投げられたらこのメソッドを呼ぶ
+  public ResponseEntity<ErrorResponse> handleNotFoundData(NotFoundException e) {
+    return build(HttpStatus.NOT_FOUND, e.getMessage(), List.of());// super(message)で預けられたメッセージを呼ぶ。
+  }
+
+  // データが受け付けられないとき
+  @ExceptionHandler(ConflictException.class)
+  public ResponseEntity<ErrorResponse> handleConflict(ConflictException e) {
+    return build(HttpStatus.CONFLICT, e.getMessage(), List.of());
+  }
+  
+  @ExceptionHandler(BadRequestException.class)
+  public ResponseEntity<ErrorResponse> handleBadRequest(BadRequestException e) {
+    return build(HttpStatus.BAD_REQUEST, e.getMessage(), List.of());
+  }
+
   @ExceptionHandler(Exception.class) // 上記で当てはまらないエラーをこっちで受けとる。Exceptionはほぼすべての例外クラスの親になる。
   public ResponseEntity<ErrorResponse> handleUnexpected(Exception e) {// エラー内容をログに出す。eを渡すことによってどこで何が起きたかまで残る。
     log.error("想定外のエラーが発生しました", e);
