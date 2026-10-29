@@ -1,11 +1,16 @@
 package com.example.demo.controller;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.demo.dto.CreateDeliveryRequest;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.service.DeliveryService;
@@ -14,6 +19,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -100,5 +106,70 @@ class AdminDeliveryControllerTest {
   void sizeが数字でなければ400を返す() throws Exception {
     mockMvc.perform(get("/api/admin/deliveries").param("size", "abc"))
         .andExpect(status().isBadRequest());
+  }
+
+  // ---------- 配送物の登録（POST） ----------
+
+  @Test
+  void 登録できたら201とLocationと登録した内容を返す() throws Exception {
+    // Given 偽物サービスに「どんなリクエストで呼ばれても、この登録結果を返す」と教える
+    DeliveryResponse created = new DeliveryResponse(1L, "123456789012", "山田太郎", "東京都千代田区1-1",
+        "09012345678", "taro@example.com", "PREPARING", "NORMAL", null, LocalDate.of(2026, 10, 28), "午前中");
+    when(deliveryService.create(any(CreateDeliveryRequest.class))).thenReturn(created);// any()は「どんなリクエストが来ても」という意味
+
+    // When / Then
+    mockMvc.perform(post("/api/admin/deliveries")// get()のPOST版
+        .contentType(MediaType.APPLICATION_JSON)// 「送るのはJSONです」と伝える。PostmanのBodyでraw→JSONを選ぶのと同じ
+        .content(validJson()))// 送るJSONの本文。PostmanのBodyに貼る内容と同じ
+        .andExpect(status().isCreated())// ステータスが201か確かめる
+        .andExpect(header().string("Location", "/api/admin/deliveries/123456789012"))// PostmanのHeadersタブで見たLocationの値を確かめる
+        .andExpect(jsonPath("$.trackingNumber").value("123456789012"))
+        .andExpect(jsonPath("$.status").value("PREPARING"));
+  }
+
+  @Test
+  void 氏名が空なら400を返す() throws Exception {
+    // 正しいJSONの氏名の部分だけを空文字に書き換えて送る
+    mockMvc.perform(post("/api/admin/deliveries")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(validJson().replace("\"name\": \"山田太郎\"", "\"name\": \"\"")))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.details[0]").value("name:お届け先の氏名を入力してください"));// detailsの1件目。GlobalExceptionHandlerが「項目名:メッセージ」の形で作る
+
+    verify(deliveryService, never()).create(any());// never()は「一度も呼ばれていない」。入力チェックで止まり、Serviceまで届いていないことを確かめる
+  }
+
+  @Test
+  void 荷物の種類が選択肢になければ400を返す() throws Exception {
+    mockMvc.perform(post("/api/admin/deliveries")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(validJson().replace("NORMAL", "BOOK")))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.details[0]").value("itemType:荷物の種類の指定が正しくありません"));
+  }
+
+  @Test
+  void 配達日の形式が正しくなければ400を返す() throws Exception {
+    // 日付の形式が違うとJSONを読み込めず、handleNotReadableで400になる。このハンドラはdetailsが空なのでstatusだけ確かめる
+    mockMvc.perform(post("/api/admin/deliveries")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(validJson().replace("2026-10-28", "2026/10/28")))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400));
+  }
+
+  // テストで送る正しい登録リクエストのJSON。"""で囲むと複数行の文字列をそのまま書ける（MapperのSQLと同じ書き方）
+  private String validJson() {
+    return """
+        {
+          "name": "山田太郎",
+          "address": "東京都千代田区1-1",
+          "callNumber": "09012345678",
+          "email": "taro@example.com",
+          "itemType": "NORMAL",
+          "deliveryDate": "2026-10-28",
+          "deliveryTime": "午前中"
+        }
+        """;
   }
 }
