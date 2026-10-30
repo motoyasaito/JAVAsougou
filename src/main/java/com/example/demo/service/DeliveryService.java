@@ -4,6 +4,7 @@ import com.example.demo.dto.CreateDeliveryRequest;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.entity.Delivery;
+import com.example.demo.exception.NotFoundException;
 import com.example.demo.mapper.DeliveryMapper;
 import java.time.ZoneId;
 import java.time.LocalDate;
@@ -65,5 +66,12 @@ public class DeliveryService {
     // findByIdはOptional（中身がないかもしれない箱）を返す。orElseThrow()は中身があれば取り出し、なければ例外を投げる
     Delivery saved = deliveryMapper.findById(delivery.getId()).orElseThrow();
     return DeliveryResponse.from(saved);// EntityはそのままでなくDTOに詰め替えて返す
+  }
+
+  // 伝票番号で配送物を1件取得する。見つからなければ404にする
+  public DeliveryResponse findByTrackingNumber(String trackingNumber) {
+    Delivery delivery = deliveryMapper.findByTrackingNumber(trackingNumber)// 伝票番号でDBから探す。結果はOptional（中身がないかもしれない箱）で返ってくる
+        .orElseThrow(() -> new NotFoundException("該当する配送物が見つかりません"));// 中身があれば取り出し、なければNotFoundExceptionを投げる（GlobalExceptionHandlerで404になる）
+    return DeliveryResponse.from(delivery);// EntityをDTOに詰め替えて返す
   }
 }

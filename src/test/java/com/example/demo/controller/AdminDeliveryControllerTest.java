@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.example.demo.dto.CreateDeliveryRequest;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
+import com.example.demo.exception.NotFoundException;
 import com.example.demo.service.DeliveryService;
 import java.time.LocalDate;
 import java.util.List;
@@ -156,6 +157,45 @@ class AdminDeliveryControllerTest {
         .content(validJson().replace("2026-10-28", "2026/10/28")))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.status").value(400));
+  }
+
+  // ---------- 配送物の詳細（GET /{trackingNumber}） ----------
+
+  @Test
+  void 伝票番号を指定すると配送物の詳細を返す() throws Exception {
+    // Given 偽物サービスに「この伝票番号で呼ばれたら、この配送物を返す」と教える
+    DeliveryResponse delivery = new DeliveryResponse(1L, "123456789012", "山田太郎", "東京都千代田区1-1",
+        "09012345678", "taro@example.com", "PREPARING", "NORMAL", 2L, LocalDate.of(2026, 10, 28), "午前中");// 返す配送物を1件作る
+    when(deliveryService.findByTrackingNumber("123456789012")).thenReturn(delivery);// URLの伝票番号がそのままServiceに渡されれば、この配送物が返る
+
+    // When / Then
+    mockMvc.perform(get("/api/admin/deliveries/123456789012"))// URLの最後に伝票番号を付けて送る。PostmanのURL欄に書くのと同じ
+        .andExpect(status().isOk())// ステータスが200か確かめる
+        .andExpect(jsonPath("$.trackingNumber").value("123456789012"))// 返ってきたJSONの伝票番号を確かめる
+        .andExpect(jsonPath("$.name").value("山田太郎"))// 氏名を確かめる
+        .andExpect(jsonPath("$.driverId").value(2));// 一覧にはない確認として、担当ドライバーのidも確かめる
+  }
+
+  @Test
+  void 伝票番号が見つからなければ404を返す() throws Exception {
+    // Given 偽物サービスに「この伝票番号で呼ばれたら、NotFoundExceptionを投げる」と教える
+    when(deliveryService.findByTrackingNumber("999999999999"))
+        .thenThrow(new NotFoundException("該当する配送物が見つかりません"));// thenThrowは「値を返す」ではなく「例外を投げる」
+
+    // When / Then
+    mockMvc.perform(get("/api/admin/deliveries/999999999999"))
+        .andExpect(status().isNotFound())// GlobalExceptionHandlerが404に変えているか確かめる
+        .andExpect(jsonPath("$.message").value("該当する配送物が見つかりません"));// 例外のメッセージがそのままレスポンスに入っているか
+  }
+
+  @Test
+  void 伝票番号が12桁でなければ400を返す() throws Exception {
+    // 12桁でない番号を送ると、@Patternで止まりServiceまで届かない。なのでGivenはいらない
+    mockMvc.perform(get("/api/admin/deliveries/12345"))
+        .andExpect(status().isBadRequest())// ステータスが400か確かめる
+        .andExpect(jsonPath("$.details[0]").value("trackingNumber:伝票番号は12桁の数字で入力してください"));// handleParameterValidationが「引数名:メッセージ」の形で作る
+
+    verify(deliveryService, never()).findByTrackingNumber(any());// 入力チェックで止まり、Serviceが一度も呼ばれていないことを確かめる
   }
 
   // テストで送る正しい登録リクエストのJSON。"""で囲むと複数行の文字列をそのまま書ける（MapperのSQLと同じ書き方）
