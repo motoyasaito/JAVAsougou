@@ -203,11 +203,11 @@ class AdminDeliveryControllerTest {
   }
 
   @Test
-  void 割り振れたら204を返す() throws Exception {
+  void 割り振れたら200を返す() throws Exception {
     mockMvc.perform(post("/api/admin/deliveries/1/driver")
         .contentType(MediaType.APPLICATION_JSON)
         .content("{\"driverId\": 2}"))
-        .andExpect(status().isNoContent());
+        .andExpect(status().isOk());
 
     verify(deliveryService).assignDriver(1L, new AssignDriverRequest(2L));
   }
@@ -219,6 +219,17 @@ class AdminDeliveryControllerTest {
         .content("{}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.details[0]").value("driverId:ドライバーを選択してください"));
+
+    verify(deliveryService, never()).assignDriver(anyLong(), any());
+  }
+
+  @Test
+  void driverIdが文字列だった場合400を返す() throws Exception {
+    mockMvc.perform(post("/api/admin/deliveries/1/driver")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"driverId\":abc}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("リクエストの形式が正しくありません"));
 
     verify(deliveryService, never()).assignDriver(anyLong(), any());
   }
