@@ -2,8 +2,11 @@ package com.example.demo.mapper;
 
 import com.example.demo.entity.Delivery;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
@@ -83,4 +86,11 @@ public interface DeliveryMapper {
       WHERE id = #{id}
       """)
   int updateStatus(@Param("id") long id, @Param("status") String status);
+
+  // 配達完了で、基準日時を過ぎている配送物を削除する
+  @Delete("""
+        DELETE FROM deliveries
+        WHERE status = 'DELIVERED' AND updated_at < #{threshold}
+      """)
+  int deleteCompleted(@Param("threshold") LocalDateTime threshold);
 }
