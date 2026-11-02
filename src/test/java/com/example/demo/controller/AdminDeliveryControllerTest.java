@@ -189,13 +189,32 @@ class AdminDeliveryControllerTest {
   }
 
   @Test
-  void 伝票番号が12桁でなければ400を返す() throws Exception {
+  void 伝票番号が12桁より短ければ400を返す() throws Exception {
     // 12桁でない番号を送ると、@Patternで止まりServiceまで届かない。なのでGivenはいらない
     mockMvc.perform(get("/api/admin/deliveries/12345"))
         .andExpect(status().isBadRequest())// ステータスが400か確かめる
         .andExpect(jsonPath("$.details[0]").value("trackingNumber:伝票番号は12桁の数字で入力してください"));// handleParameterValidationが「引数名:メッセージ」の形で作る
 
     verify(deliveryService, never()).findByTrackingNumber(any());// 入力チェックで止まり、Serviceが一度も呼ばれていないことを確かめる
+  }
+
+  @Test
+  void 伝票番号が12桁より長ければ400を返す() throws Exception {
+
+    mockMvc.perform(get("/api/admin/deliveries/1234567890123"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.details[0]").value("trackingNumber:伝票番号は12桁の数字で入力してください"));
+
+    verify(deliveryService, never()).findByTrackingNumber(any());
+  }
+
+  @Test
+  void 伝票番号が文字列がある場合400を返す() throws Exception {
+    mockMvc.perform(get("/api/admin/deliveries/abcdefghijlm"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.details[0]").value("trackingNumber:伝票番号は12桁の数字で入力してください"));
+
+    verify(deliveryService, never()).findByTrackingNumber(any());
   }
 
   // テストで送る正しい登録リクエストのJSON。"""で囲むと複数行の文字列をそのまま書ける（MapperのSQLと同じ書き方）
