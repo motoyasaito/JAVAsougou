@@ -227,7 +227,7 @@ class AdminDeliveryControllerTest {
   void driverIdが文字列だった場合400を返す() throws Exception {
     mockMvc.perform(post("/api/admin/deliveries/1/driver")
         .contentType(MediaType.APPLICATION_JSON)
-        .content("{\"driverId\":abc}"))
+        .content("{\"driverId\":\"abc\"}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("リクエストの形式が正しくありません"));
 
