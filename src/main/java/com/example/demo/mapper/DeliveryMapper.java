@@ -91,4 +91,13 @@ public interface DeliveryMapper {
         WHERE id = #{id}
       """)
   int updateDriverById(@Param("id") long id, @Param("driverId") Long driverId);
+
+  // idで配送物の担当ドライバーと配達日時を変更する
+  @Update("""
+        UPDATE deliveries
+        SET driver_id = #{driverId}, delivery_date = #{deliveryDate}, delivery_time = #{deliveryTime}, updated_at = now()
+        WHERE id = #{id}
+      """)
+  int updateDriverAndDateTimeById(@Param("id") Long id, @Param("driverId") Long driverId,
+      @Param("deliveryDate") LocalDate deliveryDate, @Param("deliveryTime") String deliveryTime);
 }
