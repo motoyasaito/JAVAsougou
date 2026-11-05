@@ -1,6 +1,7 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.CreateDeliveryRequest;
+import com.example.demo.dto.DeliveryStatusResponse;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.entity.Delivery;
@@ -73,5 +74,12 @@ public class DeliveryService {
     Delivery delivery = deliveryMapper.findByTrackingNumber(trackingNumber)// 伝票番号でDBから探す。結果はOptional（中身がないかもしれない箱）で返ってくる
         .orElseThrow(() -> new NotFoundException("該当する配送物が見つかりません"));// 中身があれば取り出し、なければNotFoundExceptionを投げる（GlobalExceptionHandlerで404になる）
     return DeliveryResponse.from(delivery);// EntityをDTOに詰め替えて返す
+  }
+
+  // 伝票番号で配送状況を取得する。見つからなければ404にする
+  public DeliveryStatusResponse findStatusByTrackingNumber(String trackingNumber) {
+    Delivery delivery = deliveryMapper.findByTrackingNumber(trackingNumber)
+        .orElseThrow(() -> new NotFoundException("該当する配送物が見つかりません"));
+    return DeliveryStatusResponse.from(delivery);
   }
 }
