@@ -2,16 +2,21 @@ package com.example.demo.controller;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
+
 import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.DeliveryStatusResponse;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.exception.NotFoundException;
+import com.example.demo.exception.ConflictException;
 import com.example.demo.service.DeliveryService;
 import java.time.LocalDate;
 import java.util.List;
@@ -20,6 +25,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.http.MediaType;
+import com.example.demo.dto.UpdateDeliveryStatusRequest;
 
 // Service をモックにして、パラメータの受け取り方・ステータス・JSON の形を確認する
 @WebMvcTest(DeliveryController.class)
@@ -143,7 +150,7 @@ class DeliveryControllerTest {
     DeliveryStatusResponse deliveryStatus = new DeliveryStatusResponse("123456789012", LocalDate.of(2026, 11, 7),
         "IN TRANSIT");
     when(deliveryService.findStatusByTrackingNumber("123456789012")).thenReturn(deliveryStatus);
-    //　When/Then
+    // When/Then
     mockMvc.perform(get("/api/deliveries/123456789012"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.trackingNumber").value("123456789012"))
@@ -157,10 +164,10 @@ class DeliveryControllerTest {
 
   @Test
   void 伝票番号が見つからなければ404を返す() throws Exception {
-    //　Given
+    // Given
     when(deliveryService.findStatusByTrackingNumber("999999999999"))
         .thenThrow(new NotFoundException("該当する配送物が見つかりません"));
-    //　When/Then
+    // When/Then
     mockMvc.perform(get("/api/deliveries/999999999999"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.message").value("該当する配送物が見つかりません"));
@@ -194,5 +201,76 @@ class DeliveryControllerTest {
         .andExpect(jsonPath("$.details[0]").value("trackingNumber:伝票番号は12桁の数字で入力してください"));
 
     verify(deliveryService, never()).findStatusByTrackingNumber(any());
+  }
+
+  @Test
+  void 配送状況を更新出来たら200を返す() throws Exception {
+    mockMvc.perform(put("/api/deliveries/1/status")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"status\":\"IN TRANSIT\"}"))
+        .andExpect(status().isOk());
+
+    verify(deliveryService).updateStatus(eq(1L), any(UpdateDeliveryStatusRequest.class));
+  }
+
+  @Test
+  void ステータス変更で配送物が見つからなければ404を返す() throws Exception {
+    // Given
+    doThrow(new NotFoundException("該当する配送物が見つかりません"))
+        .when(deliveryService).updateStatus(anyLong(), any());
+
+    // When/Then
+    mockMvc.perform(put("/api/deliveries/1/status")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"status\":\"IN TRANSIT\"}"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.message").value("該当する配送物が見つかりません"));
+  }
+
+  @Test
+  void 変更できないステータスなら409を返す() throws Exception {
+    // Given
+    doThrow(new ConflictException("配送状況を変更できません"))
+        .when(deliveryService).updateStatus(anyLong(), any());
+
+    // When/Then
+    mockMvc.perform(put("/api/deliveries/1/status")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"status\":\"DELIVERED\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.message").value("配送状況を変更できません"));
+  }
+
+  @Test
+  void ステータスが未入力なら400を返す() throws Exception {
+    mockMvc.perform(put("/api/deliveries/1/status")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.details[0]").value("status:ステータスを入力してください"));
+
+    verify(deliveryService, never()).updateStatus(anyLong(), any());
+  }
+
+  @Test
+  void ステータスが不正な値なら400を返す() throws Exception {
+    mockMvc.perform(put("/api/deliveries/1/status")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"status\":\"INVALID_STATUS\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.details[0]").value("status:ステータスの指定が正しくありません"));
+
+    verify(deliveryService, never()).updateStatus(anyLong(), any());
+  }
+
+  @Test
+  void ステータス変更で配送物IDが数字でなければ400を返す() throws Exception {
+    mockMvc.perform(put("/api/deliveries/abc/status")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"status\":\"IN TRANSIT\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.details[0]").value("id:形式が正しくありません"));
+
+    verify(deliveryService, never()).updateStatus(anyLong(), any());
   }
 }
