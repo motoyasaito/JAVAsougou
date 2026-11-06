@@ -6,13 +6,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.anyLong;
 import com.example.demo.dto.CreateDeliveryRequest;
-
+import com.example.demo.dto.UpdateDeliveryStatusRequest;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.DeliveryStatusResponse;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.entity.Delivery;
 import com.example.demo.exception.NotFoundException;
+import com.example.demo.exception.ConflictException;
 import com.example.demo.mapper.DeliveryMapper;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -260,10 +263,10 @@ class DeliveryServiceTest {
     delivery.setStatus("IN TRANSIT");
     when(deliveryMapper.findByTrackingNumber("123456789012")).thenReturn(Optional.of(delivery));
 
-    //When
+    // When
     DeliveryStatusResponse result = deliveryService.findStatusByTrackingNumber("123456789012");
 
-    //Then
+    // Then
     assertThat(result.trackingNumber()).isEqualTo("123456789012");
     assertThat(result.deliveryDate()).isEqualTo(LocalDate.of(2026, 11, 7));
     assertThat(result.status()).isEqualTo("IN TRANSIT");
@@ -276,6 +279,115 @@ class DeliveryServiceTest {
 
     // When / Then
     assertThatThrownBy(() -> deliveryService.findStatusByTrackingNumber("999999999999"))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("該当する配送物が見つかりません");
+  }
+
+  @Test
+  void ステータス変更_PREPARINGからIN_TRANSITに変更できる() {
+    // Given
+    Delivery delivery = new Delivery();
+    delivery.setStatus("PREPARING");
+    when(deliveryMapper.findById(1L)).thenReturn(Optional.of(delivery));
+
+    // When
+    deliveryService.updateStatus(1L, new UpdateDeliveryStatusRequest("IN TRANSIT"));
+
+    // Then
+    verify(deliveryMapper).updateStatus(1L, "IN TRANSIT");
+  }
+
+  @Test
+  void ステータス変更_IN_TRANSITからDELIVEREDに変更できる() {
+    // Given
+    Delivery delivery = new Delivery();
+    delivery.setStatus("IN TRANSIT");
+    when(deliveryMapper.findById(1L)).thenReturn(Optional.of(delivery));
+
+    // When
+    deliveryService.updateStatus(1L, new UpdateDeliveryStatusRequest("DELIVERED"));
+
+    // Then
+    verify(deliveryMapper).updateStatus(1L, "DELIVERED");
+  }
+
+  @Test
+  void ステータス変更_IN_TRANSITからABSENTに変更できる() {
+    // Given
+    Delivery delivery = new Delivery();
+    delivery.setStatus("IN TRANSIT");
+    when(deliveryMapper.findById(1L)).thenReturn(Optional.of(delivery));
+
+    // When
+    deliveryService.updateStatus(1L, new UpdateDeliveryStatusRequest("ABSENT"));
+
+    // Then
+    verify(deliveryMapper).updateStatus(1L, "ABSENT");
+  }
+
+  @Test
+  void ステータス変更_PREPARINGからDELIVEREDに変更できず409を返す() {
+    // Given
+    Delivery delivery = new Delivery();
+    delivery.setStatus("PREPARING");
+    when(deliveryMapper.findById(1L)).thenReturn(Optional.of(delivery));
+
+    // When / Then
+    assertThatThrownBy(() -> deliveryService.updateStatus(1L, new UpdateDeliveryStatusRequest("DELIVERED")))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("配送状況を変更できません");
+    verify(deliveryMapper, never()).updateStatus(anyLong(), any());
+  }
+
+  @Test
+  void ステータス変更_IN_TRANSITからPREPARINGに変更できず409を返す() {
+    // Given
+    Delivery delivery = new Delivery();
+    delivery.setStatus("IN TRANSIT");
+    when(deliveryMapper.findById(1L)).thenReturn(Optional.of(delivery));
+
+    // When / Then
+    assertThatThrownBy(() -> deliveryService.updateStatus(1L, new UpdateDeliveryStatusRequest("PREPARING")))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("配送状況を変更できません");
+    verify(deliveryMapper, never()).updateStatus(anyLong(), any());
+  }
+
+  @Test
+  void ステータス変更_DELIVEREDからPREPARINGに変更できず409を返す() {
+    // Given
+    Delivery delivery = new Delivery();
+    delivery.setStatus("DELIVERED");
+    when(deliveryMapper.findById(1L)).thenReturn(Optional.of(delivery));
+
+    // When / Then
+    assertThatThrownBy(() -> deliveryService.updateStatus(1L, new UpdateDeliveryStatusRequest("PREPARING")))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("配送状況を変更できません");
+    verify(deliveryMapper, never()).updateStatus(anyLong(), any());
+  }
+
+  @Test
+  void ステータス変更_ABSENTからIN_TRANSITに変更できず409を返す() {
+    // Given
+    Delivery delivery = new Delivery();
+    delivery.setStatus("ABSENT");
+    when(deliveryMapper.findById(1L)).thenReturn(Optional.of(delivery));
+
+    // When / Then
+    assertThatThrownBy(() -> deliveryService.updateStatus(1L, new UpdateDeliveryStatusRequest("IN TRANSIT")))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("配送状況を変更できません");
+    verify(deliveryMapper, never()).updateStatus(anyLong(), any());
+  }
+
+  @Test
+  void ステータス変更_該当する配送物がなければ404の例外を投げる() {
+    // Given
+    when(deliveryMapper.findById(1L)).thenReturn(Optional.empty());
+
+    // When / Then
+    assertThatThrownBy(() -> deliveryService.updateStatus(1L, new UpdateDeliveryStatusRequest("IN TRANSIT")))
         .isInstanceOf(NotFoundException.class)
         .hasMessage("該当する配送物が見つかりません");
   }

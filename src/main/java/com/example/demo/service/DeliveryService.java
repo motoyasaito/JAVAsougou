@@ -4,8 +4,10 @@ import com.example.demo.dto.CreateDeliveryRequest;
 import com.example.demo.dto.DeliveryStatusResponse;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
+import com.example.demo.dto.UpdateDeliveryStatusRequest;
 import com.example.demo.entity.Delivery;
 import com.example.demo.exception.NotFoundException;
+import com.example.demo.exception.ConflictException;
 import com.example.demo.mapper.DeliveryMapper;
 import java.time.ZoneId;
 import java.time.LocalDate;
@@ -81,5 +83,26 @@ public class DeliveryService {
     Delivery delivery = deliveryMapper.findByTrackingNumber(trackingNumber)
         .orElseThrow(() -> new NotFoundException("該当する配送物が見つかりません"));
     return DeliveryStatusResponse.from(delivery);
+  }
+
+  // 配送物のステータスを変更する。見つからなければ404、変更できない組み合わせなら409にする
+  public void updateStatus(long id, UpdateDeliveryStatusRequest request) {
+    Delivery delivery = deliveryMapper.findById(id)// idでDBから探す。結果はOptional（中身がないかもしれない箱）で返ってくる
+        .orElseThrow(() -> new NotFoundException("該当する配送物が見つかりません"));// 中身があれば取り出し、なければ404にする
+    if (!canChangeStatus(delivery.getStatus(), request.status())) {// 今のステータスと次のステータスを渡して、変更できない組み合わせかを確かめる
+      throw new ConflictException("配送状況を変更できません");// 変更できなければ例外を投げる（GlobalExceptionHandlerで409になる）
+    }
+    deliveryMapper.updateStatus(id, request.status());// チェックをすべて通ったら、DBのステータスを更新する
+  }
+
+  // 今のステータスから次のステータスへ変更してよいかを判定する。変更してよければtrue、だめならfalseを返す
+  private boolean canChangeStatus(String currentStatus, String nextStatus) {// privateなのでこのクラスの中からだけ呼べる
+    if (currentStatus.equals("PREPARING")) {// 今が発送準備中の場合
+      return nextStatus.equals("IN TRANSIT");// 次が配達中のときだけtrueを返す
+    }
+    if (currentStatus.equals("IN TRANSIT")) {// 今が配達中の場合
+      return nextStatus.equals("DELIVERED") || nextStatus.equals("ABSENT");// 次が配達完了または不在のときにtrueを返す（||は「または」）
+    }
+    return false;// それ以外（ABSENT、DELIVERED）からは変更できないのでfalseを返す
   }
 }
