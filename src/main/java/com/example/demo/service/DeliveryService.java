@@ -1,6 +1,7 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.CreateDeliveryRequest;
+import com.example.demo.dto.DeliveryStatusResponse;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.entity.Delivery;
@@ -94,5 +95,12 @@ public class DeliveryService {
       throw new ConflictException("発送準備中の配送物のみ担当を割り振れます");
     }
     deliveryMapper.updateDriverById(id, request.driverId());
+  }
+
+  // 伝票番号で配送状況を取得する。見つからなければ404にする
+  public DeliveryStatusResponse findStatusByTrackingNumber(String trackingNumber) {
+    Delivery delivery = deliveryMapper.findByTrackingNumber(trackingNumber)
+        .orElseThrow(() -> new NotFoundException("該当する配送物が見つかりません"));
+    return DeliveryStatusResponse.from(delivery);
   }
 }

@@ -3,12 +3,16 @@ package com.example.demo.controller;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.service.DeliveryService;
+import com.example.demo.dto.DeliveryStatusResponse;
+
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 
 import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,5 +34,11 @@ public class DeliveryController {
       @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
       @RequestParam(defaultValue = "0") @Min(0) int page) {
     return deliveryService.findByDriver(driverId, date, page, size);
+  }
+
+  @GetMapping("/{trackingNumber}")
+  public DeliveryStatusResponse findStatusByTrackingNumber(
+      @PathVariable @Pattern(regexp = "^[0-9]{12}$", message = "伝票番号は12桁の数字で入力してください") String trackingNumber) {
+    return deliveryService.findStatusByTrackingNumber(trackingNumber);
   }
 }

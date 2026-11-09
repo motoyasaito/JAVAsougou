@@ -2,12 +2,16 @@ package com.example.demo.controller;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.demo.dto.DeliveryResponse;
+import com.example.demo.dto.DeliveryStatusResponse;
 import com.example.demo.dto.PageResponse;
+import com.example.demo.exception.NotFoundException;
 import com.example.demo.service.DeliveryService;
 import java.time.LocalDate;
 import java.util.List;
@@ -131,5 +135,64 @@ class DeliveryControllerTest {
         .param("page", "-1"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.status").value(400));
+  }
+
+  @Test
+  void 伝票番号で配送状況を取得できる() throws Exception {
+    // Given
+    DeliveryStatusResponse deliveryStatus = new DeliveryStatusResponse("123456789012", LocalDate.of(2026, 11, 7),
+        "IN TRANSIT");
+    when(deliveryService.findStatusByTrackingNumber("123456789012")).thenReturn(deliveryStatus);
+    //　When/Then
+    mockMvc.perform(get("/api/deliveries/123456789012"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.trackingNumber").value("123456789012"))
+        .andExpect(jsonPath("$.deliveryDate").value("2026-11-07"))
+        .andExpect(jsonPath("$.status").value("IN TRANSIT"))
+        .andExpect(jsonPath("$.name").doesNotExist())
+        .andExpect(jsonPath("$.address").doesNotExist())
+        .andExpect(jsonPath("$.callNumber").doesNotExist())
+        .andExpect(jsonPath("$.email").doesNotExist());
+  }
+
+  @Test
+  void 伝票番号が見つからなければ404を返す() throws Exception {
+    //　Given
+    when(deliveryService.findStatusByTrackingNumber("999999999999"))
+        .thenThrow(new NotFoundException("該当する配送物が見つかりません"));
+    //　When/Then
+    mockMvc.perform(get("/api/deliveries/999999999999"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.message").value("該当する配送物が見つかりません"));
+  }
+
+  @Test
+  void 伝票番号が12桁より短ければ400を返す() throws Exception {
+
+    mockMvc.perform(get("/api/deliveries/12345"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.details[0]").value("trackingNumber:伝票番号は12桁の数字で入力してください"));
+
+    verify(deliveryService, never()).findStatusByTrackingNumber(any());
+  }
+
+  @Test
+  void 伝票番号が12桁より長ければ400を返す() throws Exception {
+
+    mockMvc.perform(get("/api/deliveries/1234567890123"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.details[0]").value("trackingNumber:伝票番号は12桁の数字で入力してください"));
+
+    verify(deliveryService, never()).findStatusByTrackingNumber(any());
+  }
+
+  @Test
+  void 伝票番号に数字以外が含まれていれば400を返す() throws Exception {
+
+    mockMvc.perform(get("/api/deliveries/1234567890ab"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.details[0]").value("trackingNumber:伝票番号は12桁の数字で入力してください"));
+
+    verify(deliveryService, never()).findStatusByTrackingNumber(any());
   }
 }

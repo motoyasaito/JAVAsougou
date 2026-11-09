@@ -11,6 +11,7 @@ import com.example.demo.dto.AssignDriverRequest;
 import com.example.demo.dto.CreateDeliveryRequest;
 
 import com.example.demo.dto.DeliveryResponse;
+import com.example.demo.dto.DeliveryStatusResponse;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.entity.Delivery;
 import com.example.demo.exception.ConflictException;
@@ -257,6 +258,35 @@ class DeliveryServiceTest {
     assertThatThrownBy(() -> deliveryService.findByTrackingNumber("999999999999"))// () ->で処理を包んで渡すと、例外が出てもテストが止まらず、投げられた例外を調べられる
         .isInstanceOf(NotFoundException.class)// 投げられた例外がNotFoundExceptionか確かめる
         .hasMessage("該当する配送物が見つかりません");// メッセージも確かめる。GlobalExceptionHandlerがこの文字をレスポンスに入れるため
+  }
+
+  @Test
+  void 配送状況_伝票番号で配送状況を取得してDTOに変換して返す() {
+    // Given
+    Delivery delivery = new Delivery();
+    delivery.setTrackingNumber("123456789012");
+    delivery.setDeliveryDate(LocalDate.of(2026, 11, 7));
+    delivery.setStatus("IN TRANSIT");
+    when(deliveryMapper.findByTrackingNumber("123456789012")).thenReturn(Optional.of(delivery));
+
+    //When
+    DeliveryStatusResponse result = deliveryService.findStatusByTrackingNumber("123456789012");
+
+    //Then
+    assertThat(result.trackingNumber()).isEqualTo("123456789012");
+    assertThat(result.deliveryDate()).isEqualTo(LocalDate.of(2026, 11, 7));
+    assertThat(result.status()).isEqualTo("IN TRANSIT");
+  }
+
+  @Test
+  void 配送状況_伝票番号が見つからなければ404の例外を投げる() {
+    // Given
+    when(deliveryMapper.findByTrackingNumber("999999999999")).thenReturn(Optional.empty());
+
+    // When / Then
+    assertThatThrownBy(() -> deliveryService.findStatusByTrackingNumber("999999999999"))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("該当する配送物が見つかりません");
   }
 
   // テストで使う登録リクエストを作る（2つのテストで同じものを使うのでメソッドにまとめる）
