@@ -87,10 +87,17 @@ public interface DeliveryMapper {
       """)
   int updateStatus(@Param("id") long id, @Param("status") String status);
 
-  // 配達完了で、基準日時を過ぎている配送物を削除する
   @Delete("""
         DELETE FROM deliveries
         WHERE status = 'DELIVERED' AND updated_at < #{threshold}
       """)
   int deleteCompleted(@Param("threshold") LocalDateTime threshold);
+
+  // idで配送物の担当ドライバーを変更する
+  @Update("""
+        UPDATE deliveries
+        SET driver_id = #{driverId}, updated_at = now()
+        WHERE id = #{id}
+      """)
+  int updateDriverById(@Param("id") long id, @Param("driverId") Long driverId);
 }

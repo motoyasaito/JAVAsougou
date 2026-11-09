@@ -1,6 +1,8 @@
 package com.example.demo.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -10,9 +12,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.demo.dto.AssignDriverRequest;
 import com.example.demo.dto.CreateDeliveryRequest;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
+import com.example.demo.exception.ConflictException;
 import com.example.demo.exception.NotFoundException;
 import com.example.demo.service.DeliveryService;
 import java.time.LocalDate;
@@ -189,13 +193,92 @@ class AdminDeliveryControllerTest {
   }
 
   @Test
-  void 伝票番号が12桁でなければ400を返す() throws Exception {
+  void 伝票番号が12桁より短ければ400を返す() throws Exception {
     // 12桁でない番号を送ると、@Patternで止まりServiceまで届かない。なのでGivenはいらない
     mockMvc.perform(get("/api/admin/deliveries/12345"))
         .andExpect(status().isBadRequest())// ステータスが400か確かめる
         .andExpect(jsonPath("$.details[0]").value("trackingNumber:伝票番号は12桁の数字で入力してください"));// handleParameterValidationが「引数名:メッセージ」の形で作る
 
     verify(deliveryService, never()).findByTrackingNumber(any());// 入力チェックで止まり、Serviceが一度も呼ばれていないことを確かめる
+  }
+
+  @Test
+  void 割り振れたら200を返す() throws Exception {
+    mockMvc.perform(post("/api/admin/deliveries/1/driver")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"driverId\": 2}"))
+        .andExpect(status().isOk());
+
+    verify(deliveryService).assignDriver(1L, new AssignDriverRequest(2L));
+  }
+
+  @Test
+  void driverIdがなければ400を返す() throws Exception {
+    mockMvc.perform(post("/api/admin/deliveries/1/driver")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.details[0]").value("driverId:ドライバーを選択してください"));
+
+    verify(deliveryService, never()).assignDriver(anyLong(), any());
+  }
+
+  @Test
+  void driverIdが文字列だった場合400を返す() throws Exception {
+    mockMvc.perform(post("/api/admin/deliveries/1/driver")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"driverId\":\"abc\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("リクエストの形式が正しくありません"));
+
+    verify(deliveryService, never()).assignDriver(anyLong(), any());
+  }
+
+  @Test
+  void 配送物が見つからなければ404を返す() throws Exception {
+    // Given
+    doThrow(new NotFoundException("該当する配送物が見つかりません"))
+        .when(deliveryService).assignDriver(anyLong(), any());
+
+    // When/Then
+    mockMvc.perform(post("/api/admin/deliveries/1/driver")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"driverId\":2}"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.message").value("該当する配送物が見つかりません"));
+  }
+
+  @Test
+  void 発送準備中でなければ409を返す() throws Exception {
+    // Given
+    doThrow(new ConflictException("発送準備中の配送物のみ担当を割り振れます"))
+        .when(deliveryService).assignDriver(anyLong(), any());
+
+    // When/Then
+    mockMvc.perform(post("/api/admin/deliveries/1/driver")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"driverId\":2}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.message").value("発送準備中の配送物のみ担当を割り振れます"));
+  }
+
+  @Test
+  void 伝票番号が12桁より長ければ400を返す() throws Exception {
+
+    mockMvc.perform(get("/api/admin/deliveries/1234567890123"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.details[0]").value("trackingNumber:伝票番号は12桁の数字で入力してください"));
+
+    verify(deliveryService, never()).findByTrackingNumber(any());
+  }
+
+  @Test
+  void 伝票番号が文字列がある場合400を返す() throws Exception {
+    mockMvc.perform(get("/api/admin/deliveries/abcdefghijlm"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.details[0]").value("trackingNumber:伝票番号は12桁の数字で入力してください"));
+
+    verify(deliveryService, never()).findByTrackingNumber(any());
   }
 
   // テストで送る正しい登録リクエストのJSON。"""で囲むと複数行の文字列をそのまま書ける（MapperのSQLと同じ書き方）

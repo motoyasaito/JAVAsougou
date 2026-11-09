@@ -6,17 +6,23 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
+
+import com.example.demo.dto.AssignDriverRequest;
 import com.example.demo.dto.CreateDeliveryRequest;
 
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.entity.Delivery;
+import com.example.demo.exception.ConflictException;
 import com.example.demo.exception.NotFoundException;
 import com.example.demo.mapper.DeliveryMapper;
+import com.example.demo.mapper.UserMapper;
+
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -33,8 +39,11 @@ class DeliveryServiceTest {
   @Mock
   TrackingNumberGenerator trackingNumberGenerator;// 伝票番号を作る道具の偽物。本物は毎回ランダムなので、決まった番号を返させる
 
+  @Mock
+  UserMapper userMapper;
+
   @InjectMocks
-  DeliveryService deliveryService;// 本物のServiceを作り、コンストラクタに上の偽物2つ（MapperとGenerator）を渡す
+  DeliveryService deliveryService;// 本物のServiceを作り、コンストラクタに上の偽物3つ（MapperとGenerator）を渡す
 
   // ---------- 管理者の配送物一覧（findAll） ----------
 
@@ -255,5 +264,61 @@ class DeliveryServiceTest {
     // recordは new クラス名(値, …) で作れる。値はrecordに書いた項目の順番（氏名・住所・電話・メール・種類・配達日・時間帯）で並べる
     return new CreateDeliveryRequest("山田太郎", "東京都千代田区1-1", "09012345678", "taro@example.com", "NORMAL",
         LocalDate.of(2026, 10, 28), "午前中");
+  }
+
+  // ---------- 担当ドライバーの割り振り（assignDriver） ----------
+  @Test
+  void 割り振り_発送準備中なら担当ドライバーを更新する() {
+    // Given
+    Delivery delivery = new Delivery();
+    delivery.setId(1L);
+    delivery.setStatus("PREPARING");
+    when(deliveryMapper.findById(1L)).thenReturn(Optional.of(delivery));
+    when(userMapper.existsDriverById(2L)).thenReturn(true);
+
+    // When
+    deliveryService.assignDriver(1L, new AssignDriverRequest(2L));
+
+    // Then
+    verify(deliveryMapper).updateDriverById(1L, 2L);
+  }
+
+  @Test
+  void 配送物が見つからない場合404を投げる() {
+    // Given
+    when(deliveryMapper.findById(1L)).thenReturn(Optional.empty());
+
+    // When/Then
+    assertThatThrownBy(() -> deliveryService.assignDriver(1L, new AssignDriverRequest(2L)))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("該当する配送物が見つかりません");
+  }
+
+  @Test
+  void ドライバーではない場合404を投げる() {
+    // Given
+    Delivery delivery = new Delivery();
+    delivery.setId(1L);
+    delivery.setStatus("PREPARING");
+    when(deliveryMapper.findById(1L)).thenReturn(Optional.of(delivery));
+    when(userMapper.existsDriverById(1L)).thenReturn(false);
+
+    assertThatThrownBy(() -> deliveryService.assignDriver(1, new AssignDriverRequest(1L)))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("該当するドライバーが見つかりません");
+  }
+
+  @Test
+  void 発送準備中でない場合409を投げる() {
+    // Given
+    Delivery delivery = new Delivery();
+    delivery.setStatus("IN TRANSIT");
+    when(deliveryMapper.findById(1L)).thenReturn(Optional.of(delivery));
+    when(userMapper.existsDriverById(2L)).thenReturn(true);
+
+    // When/Then
+    assertThatThrownBy(() -> deliveryService.assignDriver(1L, new AssignDriverRequest(2L)))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("発送準備中の配送物のみ担当を割り振れます");
   }
 }
