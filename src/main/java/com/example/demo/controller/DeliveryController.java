@@ -4,15 +4,20 @@ import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.service.DeliveryService;
 import com.example.demo.dto.DeliveryStatusResponse;
+import com.example.demo.dto.UpdateDeliveryStatusRequest;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 
 import java.time.LocalDate;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -40,5 +45,13 @@ public class DeliveryController {
   public DeliveryStatusResponse findStatusByTrackingNumber(
       @PathVariable @Pattern(regexp = "^[0-9]{12}$", message = "伝票番号は12桁の数字で入力してください") String trackingNumber) {
     return deliveryService.findStatusByTrackingNumber(trackingNumber);
+  }
+
+  @PutMapping("/{id}/status")
+  public ResponseEntity<Void> updateStatus(
+      @PathVariable long id,
+      @RequestBody @Valid UpdateDeliveryStatusRequest request) {
+    deliveryService.updateStatus(id, request);
+    return ResponseEntity.ok().build();
   }
 }
