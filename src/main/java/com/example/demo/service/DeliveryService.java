@@ -7,6 +7,10 @@ import com.example.demo.dto.PageResponse;
 import com.example.demo.entity.Delivery;
 import com.example.demo.exception.NotFoundException;
 import com.example.demo.mapper.DeliveryMapper;
+import com.example.demo.mapper.UserMapper;
+import com.example.demo.dto.AssignDriverRequest;
+import com.example.demo.exception.ConflictException;
+
 import java.time.ZoneId;
 import java.time.LocalDate;
 import java.util.List;
@@ -18,10 +22,13 @@ public class DeliveryService {
 
   private final DeliveryMapper deliveryMapper;
   private final TrackingNumberGenerator trackingNumberGenerator;// 伝票番号を作る道具。@Componentが付いているので、Springがコンストラクタに渡してくれる
+  private final UserMapper userMapper;
 
-  public DeliveryService(DeliveryMapper deliveryMapper, TrackingNumberGenerator trackingNumberGenerator) {
+  public DeliveryService(DeliveryMapper deliveryMapper, TrackingNumberGenerator trackingNumberGenerator,
+      UserMapper userMapper) {
     this.deliveryMapper = deliveryMapper;
     this.trackingNumberGenerator = trackingNumberGenerator;
+    this.userMapper = userMapper;
   }
 
   // 配送物の一覧を、page（0から始まるページ番号）とsize（1ページの件数）で取得する
@@ -74,6 +81,20 @@ public class DeliveryService {
     Delivery delivery = deliveryMapper.findByTrackingNumber(trackingNumber)// 伝票番号でDBから探す。結果はOptional（中身がないかもしれない箱）で返ってくる
         .orElseThrow(() -> new NotFoundException("該当する配送物が見つかりません"));// 中身があれば取り出し、なければNotFoundExceptionを投げる（GlobalExceptionHandlerで404になる）
     return DeliveryResponse.from(delivery);// EntityをDTOに詰め替えて返す
+  }
+
+  // 配送物に担当ドライバーを割り振れる。発送準備中のものだけ割り振る
+  @Transactional
+  public void assignDriver(long id, AssignDriverRequest request) {
+    Delivery delivery = deliveryMapper.findById(id)
+        .orElseThrow(() -> new NotFoundException("該当する配送物が見つかりません"));
+    if (!userMapper.existsDriverById(request.driverId())) {
+      throw new NotFoundException("該当するドライバーが見つかりません");
+    }
+    if (!delivery.getStatus().equals("PREPARING")) {
+      throw new ConflictException("発送準備中の配送物のみ担当を割り振れます");
+    }
+    deliveryMapper.updateDriverById(id, request.driverId());
   }
 
   // 伝票番号で配送状況を取得する。見つからなければ404にする
