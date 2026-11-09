@@ -83,4 +83,12 @@ public interface DeliveryMapper {
       WHERE id = #{id}
       """)
   int updateStatus(@Param("id") long id, @Param("status") String status);
+
+  // idで配送物の担当ドライバーを変更する
+  @Update("""
+        UPDATE deliveries
+        SET driver_id = #{driverId}, updated_at = now()
+        WHERE id = #{id}
+      """)
+  int updateDriverById(@Param("id") long id, @Param("driverId") Long driverId);
 }
