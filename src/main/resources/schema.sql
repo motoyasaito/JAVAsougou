@@ -1,4 +1,5 @@
 -- 起動のたびに作り直す（参照されている側を後に削除）
+DROP TABLE IF EXISTS deliveries_alerts;
 DROP TABLE IF EXISTS redeliveries;
 DROP TABLE IF EXISTS deliveries;
 DROP TABLE IF EXISTS users;
@@ -50,5 +51,14 @@ CREATE TABLE redeliveries (
     redelivery_time   VARCHAR(20),
     created_at        TIMESTAMP   NOT NULL DEFAULT now(),
     updated_at        TIMESTAMP   NOT NULL DEFAULT now(),  -- 更新時はUPDATE文でnow()を設定する
+    FOREIGN KEY (delivery_id) REFERENCES deliveries(id)
+);
+
+-- 翌日配送完了漏れテーブル
+CREATE TABLE deliveries_alerts (
+    id            BIGSERIAL PRIMARY KEY,
+    delivery_id   BIGINT    NOT NULL UNIQUE,
+    detected_date DATE      NOT NULL,
+    created_at    TIMESTAMP NOT NULL DEFAULT now(),
     FOREIGN KEY (delivery_id) REFERENCES deliveries(id)
 );
