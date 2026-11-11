@@ -12,6 +12,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import static org.mockito.Mockito.when;
+
+import com.example.demo.mapper.DeliveryAlertMapper;
 import com.example.demo.mapper.DeliveryMapper;
 import com.example.demo.mapper.RedeliveryMapper;
 
@@ -25,20 +27,24 @@ class DeleteCompletedServiceTest {
   @Mock
   DeliveryMapper deliveryMapper;// 配送物のマッパーの偽物
 
+  @Mock
+  DeliveryAlertMapper deliveryAlertMapper; //アラートのマッパーの偽物
+
   @InjectMocks
-  DeleteCompletedService deleteCompletedService;// 本物のServiceを作り、コンストラクタに上の偽物2つを渡す
+  DeleteCompletedService deleteCompletedService;// 本物のServiceを作り、コンストラクタに上の偽物3つを渡す
 
   @Test
-  void 削除_再配達を消してから配送物を消す() {
+  void 削除_アラート再配達配送物の順で消す() {
     // Given テストで使う基準日時を決める
     LocalDateTime threshold = LocalDateTime.of(2026, 10, 1, 3, 0);// 2026/10/1/3:00
 
     // When 本物のServiceで削除を実行する。偽物のMapperは何も教えていないので、件数として0を返す
     deleteCompletedService.deleteCompleted(threshold);
-    // Then 再配達→配送物の順で、同じ基準日時で呼ばれたか確かめる
-    InOrder inOrder = inOrder(redeliveryMapper, deliveryMapper);// 順番を見張る係を作る
-    inOrder.verify(redeliveryMapper).deleteByCompletedDeliveries(threshold);// 1番目に呼ばれたか
-    inOrder.verify(deliveryMapper).deleteCompleted(threshold);// 2番目に呼ばれたか。順番が逆だとここで失敗する
+    // Then アラート→再配達→配送物の順で、同じ基準日時で呼ばれたか確かめる
+    InOrder inOrder = inOrder(deliveryAlertMapper, redeliveryMapper, deliveryMapper);// 順番を見張る係を作る
+    inOrder.verify(deliveryAlertMapper).deleteByCompletedDeliveries(threshold);// 1番目に呼ばれたか
+    inOrder.verify(redeliveryMapper).deleteByCompletedDeliveries(threshold);// 2番目に呼ばれたか
+    inOrder.verify(deliveryMapper).deleteCompleted(threshold);// 3番目に呼ばれたか。順番が逆だとここで失敗する
   }
 
   @Test
