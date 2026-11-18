@@ -2,11 +2,15 @@ package com.example.demo.mapper;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+import com.example.demo.entity.DeliveryAlert;
 
 @Mapper
 public interface DeliveryAlertMapper {
@@ -31,4 +35,25 @@ public interface DeliveryAlertMapper {
         ON CONFLICT (delivery_id) DO NOTHING
       """)
   int insertOverdue(@Param("today") LocalDate today);
+
+  @Select("""
+      SELECT d.name, d.tracking_number, d.status,
+      COALESCE(
+              (SELECT MAX(r.redelivery_date) FROM redeliveries r WHERE r.delivery_id = d.id),d.delivery_date) AS delivery_date,
+               d.driver_id, a.detected_date, d.updated_at
+      FROM deliveries_alerts a
+      JOIN deliveries d ON a.delivery_id = d.id
+      WHERE d.status != 'DELIVERED'
+      ORDER BY a.detected_date, a.id
+      LIMIT #{limit} OFFSET #{offset}
+      """)
+  List<DeliveryAlert> findPending(@Param("limit") int limit, @Param("offset") long offset);
+
+  @Select("""
+      SELECT COUNT(*)
+      FROM deliveries_alerts a
+      JOIN deliveries d ON a.delivery_id = d.id
+      WHERE d.status != 'DELIVERED'
+      """)
+  long countPending();
 }
