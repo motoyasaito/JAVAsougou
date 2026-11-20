@@ -85,6 +85,24 @@
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
 			<version>3.1.1</version>
 		</dependency>
+
+		<!-- JSP（画面）を動かすための部品。JSP を Java に変換して実行する Tomcat の仕組み（Jasper） -->
+		<!-- バージョンは Spring Boot が管理しているので書かない -->
+		<dependency>
+			<groupId>org.apache.tomcat.embed</groupId>
+			<artifactId>tomcat-embed-jasper</artifactId>
+		</dependency>
+
+		<!-- JSTL：JSP の中で繰り返し（c:forEach）や条件分岐（c:if）を書くためのタグ -->
+		<!-- api はタグの決まりごと、もう一つはその中身（実装）。2つそろって動く -->
+		<dependency>
+			<groupId>jakarta.servlet.jsp.jstl</groupId>
+			<artifactId>jakarta.servlet.jsp.jstl-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.glassfish.web</groupId>
+			<artifactId>jakarta.servlet.jsp.jstl</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>

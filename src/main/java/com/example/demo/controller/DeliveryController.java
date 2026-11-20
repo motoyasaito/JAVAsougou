@@ -1,6 +1,7 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.DeliveryResponse;
+import com.example.demo.dto.DeliveryRules;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.service.DeliveryService;
 import com.example.demo.dto.DeliveryStatusResponse;
@@ -38,7 +39,7 @@ public class DeliveryController {
 
   @GetMapping("/{trackingNumber}")
   public DeliveryStatusResponse findStatusByTrackingNumber(
-      @PathVariable @Pattern(regexp = "^[0-9]{12}$", message = "伝票番号は12桁の数字で入力してください") String trackingNumber) {
+      @PathVariable @Pattern(regexp = DeliveryRules.TRACKING_NUMBER_PATTERN, message = "伝票番号は12桁の数字で入力してください") String trackingNumber) {
     return deliveryService.findStatusByTrackingNumber(trackingNumber);
   }
 }

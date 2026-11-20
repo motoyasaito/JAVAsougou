@@ -1,6 +1,7 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.CreateDeliveryRequest;
+import com.example.demo.dto.DeliveryDetailResponse;
 import com.example.demo.dto.DeliveryStatusResponse;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
@@ -11,7 +12,7 @@ import com.example.demo.mapper.UserMapper;
 import com.example.demo.dto.AssignDriverRequest;
 import com.example.demo.exception.ConflictException;
 
-import java.time.ZoneId;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -23,12 +24,14 @@ public class DeliveryService {
   private final DeliveryMapper deliveryMapper;
   private final TrackingNumberGenerator trackingNumberGenerator;// 伝票番号を作る道具。@Componentが付いているので、Springがコンストラクタに渡してくれる
   private final UserMapper userMapper;
+  private final Clock clock;// 「今」を知る時計（TimeConfig で日本時間にしている）。テストでは決まった日の時計を渡せる
 
   public DeliveryService(DeliveryMapper deliveryMapper, TrackingNumberGenerator trackingNumberGenerator,
-      UserMapper userMapper) {
+      UserMapper userMapper, Clock clock) {
     this.deliveryMapper = deliveryMapper;
     this.trackingNumberGenerator = trackingNumberGenerator;
     this.userMapper = userMapper;
+    this.clock = clock;
   }
 
   // 配送物の一覧を、page（0から始まるページ番号）とsize（1ページの件数）で取得する
@@ -46,7 +49,7 @@ public class DeliveryService {
   public PageResponse<DeliveryResponse> findByDriver(long driverId, LocalDate deliveryDate, int page, int size) {
     LocalDate targetDate;
     if (deliveryDate == null) {
-      targetDate = LocalDate.now(ZoneId.of("Asia/Tokyo"));
+      targetDate = LocalDate.now(clock);// 日本時間の今日
     } else {
       targetDate = deliveryDate;
     }
@@ -83,6 +86,18 @@ public class DeliveryService {
     return DeliveryResponse.from(delivery);// EntityをDTOに詰め替えて返す
   }
 
+  // 伝票番号で配送物を1件取得し、登録日時と最終更新日時も一緒に返す（管理者の詳細画面で使う）。見つからなければ404にする
+  public DeliveryDetailResponse findDetailByTrackingNumber(String trackingNumber) {
+    Delivery delivery = deliveryMapper.findByTrackingNumber(trackingNumber)
+        .orElseThrow(() -> new NotFoundException("該当する配送物が見つかりません"));
+    return DeliveryDetailResponse.from(delivery);
+  }
+
+  // 伝票番号の配送物があるかどうかを返す（画面の伝票番号検索で使う）
+  public boolean existsByTrackingNumber(String trackingNumber) {
+    return deliveryMapper.existsByTrackingNumber(trackingNumber);// 登録時の重複チェックで使っているMapperのメソッドをそのまま使う
+  }
+
   // 配送物に担当ドライバーを割り振れる。発送準備中のものだけ割り振る
   @Transactional
   public void assignDriver(long id, AssignDriverRequest request) {
@@ -98,8 +113,9 @@ public class DeliveryService {
   }
 
   // 伝票番号で配送状況を取得する。見つからなければ404にする
+  // 配達予定日と時間帯は、再配達があれば最新の再配達のもの（Mapper の findStatusByTrackingNumber で決めている）
   public DeliveryStatusResponse findStatusByTrackingNumber(String trackingNumber) {
-    Delivery delivery = deliveryMapper.findByTrackingNumber(trackingNumber)
+    Delivery delivery = deliveryMapper.findStatusByTrackingNumber(trackingNumber)
         .orElseThrow(() -> new NotFoundException("該当する配送物が見つかりません"));
     return DeliveryStatusResponse.from(delivery);
   }

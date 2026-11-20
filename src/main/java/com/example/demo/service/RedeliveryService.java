@@ -1,7 +1,7 @@
 package com.example.demo.service;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.time.Clock;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,10 +19,12 @@ import com.example.demo.exception.ConflictException;
 public class RedeliveryService {
   private final DeliveryMapper deliveryMapper;
   private final RedeliveryMapper redeliveryMapper;
+  private final Clock clock;// 「今」を知る時計（TimeConfig で日本時間にしている）。テストでは決まった日の時計を渡せる
 
-  public RedeliveryService(DeliveryMapper deliveryMapper, RedeliveryMapper redeliveryMapper) {
+  public RedeliveryService(DeliveryMapper deliveryMapper, RedeliveryMapper redeliveryMapper, Clock clock) {
     this.deliveryMapper = deliveryMapper;
     this.redeliveryMapper = redeliveryMapper;
+    this.clock = clock;
   }
 
   // 再配達登録し、配送物のステータスをPREPARINGに戻す
@@ -33,7 +35,7 @@ public class RedeliveryService {
     if (!delivery.getCallNumber().equals(request.callNumber())) {
       throw new NotFoundException("該当する配送物が見つかりません");
     }
-    LocalDate today = LocalDate.now(ZoneId.of("Asia/Tokyo"));
+    LocalDate today = LocalDate.now(clock);// 日本時間の今日
     if (!request.redeliveryDate().isAfter(today)) {
       throw new BadRequestException("再配達日は明日以降の日付を選択してください");
     }
