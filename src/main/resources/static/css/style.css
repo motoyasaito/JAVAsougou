@@ -1,0 +1,482 @@
+/* ============================================================
+   全画面で共通の見た目
+   色や余白は最初に変数（--名前）で決めて、下ではその変数を使う。
+   色を変えたいときは、ここだけ直せば全画面に反映される。
+   ============================================================ */
+:root {
+  --color-primary: #2563eb;       /* メインの色（ボタン・リンク） */
+  --color-primary-dark: #1d4ed8;  /* ボタンにマウスを乗せたとき */
+  --color-sidebar: #1e293b;       /* 左メニューの背景 */
+  --color-sidebar-text: #cbd5e1;  /* 左メニューの文字 */
+  --color-bg: #f1f5f9;            /* 画面の背景 */
+  --color-surface: #ffffff;       /* カード（白い箱）の背景 */
+  --color-border: #e2e8f0;        /* 線 */
+  --color-text: #0f172a;          /* 文字 */
+  --color-text-sub: #64748b;      /* 補足の文字 */
+  --color-error: #dc2626;         /* エラー */
+  --radius: 8px;                  /* 角の丸み */
+}
+
+* {
+  box-sizing: border-box; /* 幅に内側の余白と線を含める（幅の計算が分かりやすくなる） */
+}
+
+body {
+  margin: 0;
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+  font-size: 14px;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+/* ---------- 画面全体の形（左メニュー＋右の本体） ---------- */
+.layout {
+  display: flex;         /* 子（左メニューと本体）を横に並べる */
+  min-height: 100vh;     /* 画面の高さいっぱいまで広げる */
+}
+
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;        /* 画面が狭くても左メニューは縮めない */
+  background: var(--color-sidebar);
+  color: var(--color-sidebar-text);
+}
+
+.sidebar-brand {
+  padding: 20px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #ffffff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column; /* メニューを縦に並べる */
+  padding: 12px 0;
+}
+
+.sidebar-link {
+  padding: 10px 20px;
+  color: var(--color-sidebar-text);
+  text-decoration: none;
+  border-left: 3px solid transparent;
+}
+
+.sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+/* 今いる画面のメニュー */
+.sidebar-link.is-active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-left-color: var(--color-primary);
+}
+
+.main {
+  flex: 1;               /* 左メニュー以外の幅を全部使う */
+  min-width: 0;          /* 表が長くても、はみ出さずに本体の中でスクロールさせるため */
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  justify-content: flex-end; /* 右に寄せる */
+  align-items: center;
+  height: 56px;
+  padding: 0 24px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.topbar-user {
+  color: var(--color-text-sub);
+}
+
+.topbar-logout {
+  margin: 0 0 0 16px;    /* フォームは前後に余白が付くので消して、名前との間だけあける */
+}
+
+/* 小さいボタン（上の帯など、目立たせたくない場所） */
+.button-small {
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+.content {
+  padding: 24px;
+}
+
+/* ---------- 画面のタイトル ---------- */
+.page-header {
+  display: flex;
+  justify-content: space-between; /* タイトルは左、ボタンは右 */
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 20px;
+}
+
+/* ---------- カード（白い箱） ---------- */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+/* ---------- ボタン・入力欄 ---------- */
+.button {
+  display: inline-block;
+  padding: 8px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 14px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--color-bg);
+}
+
+.button-primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.button-primary:hover {
+  background: var(--color-primary-dark);
+}
+
+.input {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.input:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -1px;
+}
+
+/* ---------- 検索 ---------- */
+.search-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;              /* 中の部品どうしの間をあける */
+  flex-wrap: wrap;       /* 狭い画面では折り返す */
+}
+
+.search-label {
+  font-weight: bold;
+}
+
+/* ---------- 一覧の表 ---------- */
+.table-count {
+  margin: 0 0 12px;
+  color: var(--color-text-sub);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  white-space: nowrap;   /* 1つのセルの中で折り返さない */
+}
+
+.table th {
+  color: var(--color-text-sub);
+  font-weight: normal;
+  font-size: 13px;
+  background: #f8fafc;
+}
+
+.table tbody tr:hover {
+  background: #f8fafc;   /* マウスを乗せた行を分かりやすくする */
+}
+
+.link {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.text-sub {
+  margin-left: 6px;
+  color: var(--color-text-sub);
+}
+
+/* ---------- 状態のバッジ ---------- */
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;  /* 丸い形にする */
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.badge-gray   { background: #f1f5f9; color: #475569; }
+.badge-blue   { background: #dbeafe; color: #1d4ed8; }
+.badge-green  { background: #dcfce7; color: #15803d; }
+.badge-red    { background: #fee2e2; color: #b91c1c; }
+.badge-yellow { background: #fef3c7; color: #b45309; }
+
+/* ---------- ページの移動 ---------- */
+.pager {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 16px;
+}
+
+.pager-item {
+  min-width: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  text-align: center;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+a.pager-item:hover {
+  background: var(--color-bg);
+}
+
+.pager-item.is-current {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.pager-item.is-disabled {
+  color: #cbd5e1;
+}
+
+/* ---------- 詳細画面 ---------- */
+.back-link {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: var(--color-text-sub);
+  text-decoration: none;
+}
+
+.back-link:hover {
+  color: var(--color-primary);
+}
+
+.card-title {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+/* 項目名と値を、2列の表のように並べる */
+.detail-list {
+  display: grid;
+  grid-template-columns: 140px 1fr; /* 1列目（項目名）は140px、2列目（値）は残り全部 */
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.detail-list dt {
+  color: var(--color-text-sub);
+}
+
+.detail-list dd {
+  margin: 0;
+  word-break: break-all; /* 長いメールアドレスなどは折り返す */
+}
+
+/* ラベル・入力欄・ボタンを横に並べるフォーム */
+.inline-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.form-label {
+  font-weight: bold;
+}
+
+select.input {
+  min-width: 220px;
+  background: var(--color-surface);
+}
+
+/* ---------- 入力フォーム（登録画面など） ---------- */
+.form {
+  max-width: 760px;      /* 入力欄が横に長くなりすぎないようにする */
+}
+
+.form-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* 1項目分（ラベルと入力欄）を横に並べる */
+.form-row {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.form-row .form-label {
+  padding-top: 8px;      /* 入力欄の文字の高さに合わせる */
+}
+
+.form-field .input {
+  width: 100%;
+  max-width: 420px;
+  font-family: inherit;
+}
+
+textarea.input {
+  resize: vertical;      /* 高さだけ変えられるようにする */
+}
+
+.required {
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: normal;
+}
+
+.field-hint {
+  margin: 4px 0 0;
+  color: var(--color-text-sub);
+  font-size: 12px;
+}
+
+.field-error {
+  margin: 4px 0 0;
+  color: var(--color-error);
+  font-size: 13px;
+}
+
+.input.is-invalid {
+  border-color: var(--color-error);
+  background: #fffafa;
+}
+
+/* 下のボタン（キャンセル・登録） */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 登録・更新のあとのお知らせ */
+.alert {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: var(--radius);
+  border: 1px solid;
+}
+
+.alert-success {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.alert-error {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+/* ---------- メッセージ ---------- */
+.message-empty {
+  margin: 24px 0;
+  text-align: center;
+  color: var(--color-text-sub);
+}
+
+.message-error {
+  margin: 8px 0 0;
+  color: var(--color-error);
+}
+
+.error-card .message-error {
+  margin: 16px 0;
+}
+
+/* ---------- 狭い画面（スマホなど） ---------- */
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column; /* 左メニューを上に移す */
+  }
+
+  .sidebar {
+    width: 100%;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;    /* メニューを横に並べる */
+    overflow-x: auto;
+  }
+
+  .content {
+    padding: 16px;
+  }
+
+  .card {
+    overflow-x: auto;       /* 表が画面より広いときは、カードの中で横にスクロールさせる */
+  }
+
+  .detail-list {
+    grid-template-columns: 1fr; /* 狭い画面では、項目名の下に値を出す */
+    gap: 2px;
+  }
+
+  .detail-list dd {
+    margin-bottom: 10px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr; /* 狭い画面では、ラベルの下に入力欄を出す */
+    gap: 4px;
+  }
+
+  .form-row .form-label {
+    padding-top: 0;
+  }
+}

@@ -17,12 +17,13 @@ import org.apache.ibatis.annotations.Update;
 @Mapper
 public interface DeliveryMapper {
 
-  // 配送物を日付順に、指定した件数（limit）だけ、指定した位置（offset）から取得する
+  // 配送物を登録の新しい順に、指定した件数（limit）だけ、指定した位置（offset）から取得する
+  // 登録日時が同じとき（data.sql でまとめて入れたときなど）は、id の大きい順（あとから入れた順）にする
   @Select("""
       SELECT id, tracking_number, name, address, call_number, email, status, item_type,
              driver_id, delivery_date, delivery_time, created_at, updated_at
       FROM deliveries
-      ORDER BY delivery_date, id
+      ORDER BY created_at DESC, id DESC
       LIMIT #{limit} OFFSET #{offset}
       """)
   List<Delivery> findAll(@Param("limit") int limit, @Param("offset") long offset);

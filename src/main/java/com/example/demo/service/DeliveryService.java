@@ -1,6 +1,7 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.CreateDeliveryRequest;
+import com.example.demo.dto.DeliveryDetailResponse;
 import com.example.demo.dto.DeliveryStatusResponse;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
@@ -81,6 +82,18 @@ public class DeliveryService {
     Delivery delivery = deliveryMapper.findByTrackingNumber(trackingNumber)// 伝票番号でDBから探す。結果はOptional（中身がないかもしれない箱）で返ってくる
         .orElseThrow(() -> new NotFoundException("該当する配送物が見つかりません"));// 中身があれば取り出し、なければNotFoundExceptionを投げる（GlobalExceptionHandlerで404になる）
     return DeliveryResponse.from(delivery);// EntityをDTOに詰め替えて返す
+  }
+
+  // 伝票番号で配送物を1件取得し、登録日時と最終更新日時も一緒に返す（管理者の詳細画面で使う）。見つからなければ404にする
+  public DeliveryDetailResponse findDetailByTrackingNumber(String trackingNumber) {
+    Delivery delivery = deliveryMapper.findByTrackingNumber(trackingNumber)
+        .orElseThrow(() -> new NotFoundException("該当する配送物が見つかりません"));
+    return DeliveryDetailResponse.from(delivery);
+  }
+
+  // 伝票番号の配送物があるかどうかを返す（画面の伝票番号検索で使う）
+  public boolean existsByTrackingNumber(String trackingNumber) {
+    return deliveryMapper.existsByTrackingNumber(trackingNumber);// 登録時の重複チェックで使っているMapperのメソッドをそのまま使う
   }
 
   // 配送物に担当ドライバーを割り振れる。発送準備中のものだけ割り振る

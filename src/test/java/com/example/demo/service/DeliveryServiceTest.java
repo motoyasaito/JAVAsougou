@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.any;
 import com.example.demo.dto.AssignDriverRequest;
 import com.example.demo.dto.CreateDeliveryRequest;
 
+import com.example.demo.dto.DeliveryDetailResponse;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.DeliveryStatusResponse;
 import com.example.demo.dto.PageResponse;
@@ -20,6 +21,7 @@ import com.example.demo.mapper.DeliveryMapper;
 import com.example.demo.mapper.UserMapper;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -350,5 +352,50 @@ class DeliveryServiceTest {
     assertThatThrownBy(() -> deliveryService.assignDriver(1L, new AssignDriverRequest(2L)))
         .isInstanceOf(ConflictException.class)
         .hasMessage("発送準備中の配送物のみ担当を割り振れます");
+  }
+
+  // ---------- 管理者の詳細画面（findDetailByTrackingNumber） ----------
+
+  @Test
+  void 詳細画面_配送物と登録日時と最終更新日時を返す() {
+    Delivery delivery = new Delivery();
+    delivery.setId(1L);
+    delivery.setTrackingNumber("100000000001");
+    delivery.setStatus("PREPARING");
+    delivery.setCreatedAt(LocalDateTime.of(2026, 10, 20, 10, 15));
+    delivery.setUpdatedAt(LocalDateTime.of(2026, 10, 21, 9, 0));
+    when(deliveryMapper.findByTrackingNumber("100000000001")).thenReturn(Optional.of(delivery));
+
+    DeliveryDetailResponse result = deliveryService.findDetailByTrackingNumber("100000000001");
+
+    assertThat(result.delivery().trackingNumber()).isEqualTo("100000000001");
+    assertThat(result.delivery().status()).isEqualTo("PREPARING");
+    assertThat(result.createdAt()).isEqualTo(LocalDateTime.of(2026, 10, 20, 10, 15));
+    assertThat(result.updatedAt()).isEqualTo(LocalDateTime.of(2026, 10, 21, 9, 0));
+  }
+
+  @Test
+  void 詳細画面_見つからなければ404を投げる() {
+    when(deliveryMapper.findByTrackingNumber("999999999999")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> deliveryService.findDetailByTrackingNumber("999999999999"))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("該当する配送物が見つかりません");
+  }
+
+  // ---------- 伝票番号の存在確認（existsByTrackingNumber） ----------
+
+  @Test
+  void 存在確認_配送物があればtrueを返す() {
+    when(deliveryMapper.existsByTrackingNumber("100000000001")).thenReturn(true);
+
+    assertThat(deliveryService.existsByTrackingNumber("100000000001")).isTrue();
+  }
+
+  @Test
+  void 存在確認_配送物がなければfalseを返す() {
+    when(deliveryMapper.existsByTrackingNumber("999999999999")).thenReturn(false);
+
+    assertThat(deliveryService.existsByTrackingNumber("999999999999")).isFalse();
   }
 }
