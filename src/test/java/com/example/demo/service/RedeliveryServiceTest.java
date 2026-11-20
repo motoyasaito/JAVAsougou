@@ -18,12 +18,14 @@ import com.example.demo.exception.BadRequestException;
 import com.example.demo.exception.ConflictException;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.Spy;
+import com.example.demo.support.FixedClockConfig;
+import java.time.Clock;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -35,6 +37,9 @@ class RedeliveryServiceTest {
 
   @Mock
   DeliveryMapper deliveryMapper;
+
+  @Spy
+  Clock clock = FixedClockConfig.fixedClock();// 決まった日（2026-11-20）の時計。@Spy にすると、@InjectMocks のコンストラクタに渡される
 
   @InjectMocks
   RedeliveryService redeliveryService;
@@ -97,7 +102,7 @@ class RedeliveryServiceTest {
 
     // Given
     when(deliveryMapper.findByTrackingNumber("123456789012")).thenReturn(Optional.of(absentDelivery()));
-    LocalDate today = LocalDate.now(ZoneId.of("Asia/Tokyo"));
+    LocalDate today = FixedClockConfig.TODAY;
     CreateRedeliveryRequest request = new CreateRedeliveryRequest("123456789012", "08055551122", today, "午前中");
 
     // When/Then
@@ -107,7 +112,7 @@ class RedeliveryServiceTest {
 
   private CreateRedeliveryRequest createRedeliveryRequest() {
     return new CreateRedeliveryRequest("123456789012", "08055551122",
-        LocalDate.now(ZoneId.of("Asia/Tokyo")).plusDays(1), "午前中");
+        FixedClockConfig.TODAY.plusDays(1), "午前中");
   }
 
   private Delivery absentDelivery() {

@@ -29,7 +29,7 @@ public record CreateDeliveryRequest(// recordは「値を入れて運ぶだけ�
     // 400 になります。
     // @NotNull：LocalDate は文字列ではないので、@NotBlank は使えません。「値がない」ことだけを確認する @NotNull
     // を使います。
-    @NotBlank(message = "時間帯を入力してください") @Pattern(regexp = "午前中|12:00-14:00|14:00-16:00|16:00-18:00|18:00-20:00", message = "時間帯の指定が正しくありません") String deliveryTime) {
+    @NotBlank(message = "時間帯を入力してください") @Pattern(regexp = DeliveryRules.DELIVERY_TIME_PATTERN, message = "時間帯の指定が正しくありません") String deliveryTime) {
   public Delivery toEntity() {// このリクエストの内容を、DB 登録用の Delivery（Entity）に詰め替えるメソッドです。Service から
                               // request.toEntity() で呼びます。
     Delivery delivery = new Delivery();
