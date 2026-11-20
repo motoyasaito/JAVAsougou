@@ -20,6 +20,8 @@ services:
       - ./resources:/app/resources # 必要ならリソースをマウント
       - ~/.m2:/root/.m2 # Maven の依存関係キャッシュ
       - ./logs:/app/logs # PCの logs を、コンテナの /app/logs につなぐ
+    env_file:
+      - .env
 
   postgres:
     image: postgres:17
