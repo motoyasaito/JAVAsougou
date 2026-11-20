@@ -785,6 +785,81 @@ textarea.input {
   color: var(--color-text-sub);
 }
 
+/* ---------- ログイン画面 ---------- */
+.login-body {
+  display: flex;
+  align-items: center;     /* 上下の真ん中に置く */
+  justify-content: center; /* 左右の真ん中に置く */
+  min-height: 100vh;
+  background: var(--color-sidebar);
+}
+
+.login-content {
+  width: min(400px, calc(100% - 32px));
+  padding: 32px 0;
+}
+
+.login-brand {
+  margin-bottom: 16px;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.login-card {
+  padding: 28px;
+}
+
+.login-title {
+  margin: 0 0 20px;
+  font-size: 18px;
+  text-align: center;
+}
+
+.login-field {
+  margin-bottom: 16px;
+}
+
+.login-field .form-label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.login-field .input {
+  width: 100%;
+}
+
+.login-button {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px;
+}
+
+/* ログインができるまでの仮の入口 */
+.login-temporary {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.login-temporary .text-sub {
+  margin: 0 0 6px;
+  color: var(--color-sidebar-text);
+}
+
+.login-temporary-links {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.login-temporary-links .link {
+  color: #93c5fd;
+}
+
 /* ---------- 狭い画面（スマホなど） ---------- */
 @media (max-width: 768px) {
   .layout {
