@@ -129,6 +129,6 @@ class AdminDeliveryViewControllerTest {
         .andExpect(status().isInternalServerError())
         .andExpect(view().name("common/error"))
         .andExpect(model().attribute("message", "システムでエラーが発生しました。時間をおいて、もう一度お試しください"))
-        .andExpect(model().attribute("adminPage", true));// 管理者の画面なので、左メニューのある外枠にする
+        .andExpect(model().attribute("area", "admin"));// 管理者の画面なので、左メニューのある外枠にする
   }
 }

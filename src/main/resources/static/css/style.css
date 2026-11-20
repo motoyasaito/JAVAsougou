@@ -417,6 +417,13 @@ textarea.input {
   color: #15803d;
 }
 
+/* 処理がまだできていない画面の「準備中」の帯 */
+.alert-warning {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
 .alert-error {
   background: #fef2f2;
   border-color: #fecaca;
@@ -437,6 +444,13 @@ textarea.input {
 
 .error-card .message-error {
   margin: 16px 0;
+}
+
+/* エラー画面のボタン（前の画面に戻る・決まった画面へ）を横に並べる */
+.error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* ---------- お客さん用の画面 ---------- */
@@ -621,6 +635,154 @@ textarea.input {
 .status-message.is-absent {
   background: #fef2f2;
   color: #b91c1c;
+}
+
+/* ---------- ドライバーの画面（スマホで見る前提） ---------- */
+.driver-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--color-sidebar);
+  color: #ffffff;
+}
+
+.driver-brand {
+  font-weight: bold;
+}
+
+.driver-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.driver-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.driver-switch-label {
+  font-size: 12px;
+  color: var(--color-sidebar-text);
+}
+
+.input-small {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.driver-content {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.driver-date-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.driver-date {
+  text-align: center;
+}
+
+.driver-title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.driver-back-today {
+  margin: 0 0 12px;
+  text-align: center;
+}
+
+.message-card {
+  text-align: center;
+}
+
+/* 配達物のカード */
+.delivery-cards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.delivery-cards li + li {
+  margin-top: 10px;
+}
+
+.delivery-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.delivery-card:hover,
+.delivery-card:focus-visible {
+  border-color: var(--color-primary);
+}
+
+.delivery-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.delivery-card-time {
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.delivery-card-name {
+  font-size: 15px;
+}
+
+.delivery-card-address {
+  color: var(--color-text);
+}
+
+.delivery-card-meta {
+  color: var(--color-text-sub);
+  font-size: 12px;
+}
+
+/* モーダルの中のステータス変更 */
+.status-change {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.status-change-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.status-change-row .input {
+  flex: 1;
+}
+
+.input:disabled {
+  background: var(--color-bg);
+  color: var(--color-text-sub);
 }
 
 /* ---------- 狭い画面（スマホなど） ---------- */

@@ -8,8 +8,8 @@ import com.example.demo.exception.NotFoundException;
 import com.example.demo.service.RedeliveryService;
 
 import jakarta.validation.Valid;
+import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneId;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -26,9 +26,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class RedeliveryRequestViewController {
 
   private final RedeliveryService redeliveryService;
+  private final Clock clock;// 「今」を知る時計（TimeConfig で日本時間にしている）
 
-  public RedeliveryRequestViewController(RedeliveryService redeliveryService) {
+  public RedeliveryRequestViewController(RedeliveryService redeliveryService, Clock clock) {
     this.redeliveryService = redeliveryService;
+    this.clock = clock;
   }
 
   // 依頼の入力画面を表示する。配送状況の画面から来たときは ?trackingNumber=... が付いていて、最初から入力しておく
@@ -70,6 +72,6 @@ public class RedeliveryRequestViewController {
   // 希望日として選べるいちばん早い日（明日）を JSP に渡す。カレンダーで今日以前を選べないようにするため
   // サーバー側（Service）でも同じチェックをしているので、ブラウザのチェックをすり抜けても受け付けない
   private void addMinDate(Model model) {
-    model.addAttribute("minDate", LocalDate.now(ZoneId.of("Asia/Tokyo")).plusDays(1));
+    model.addAttribute("minDate", LocalDate.now(clock).plusDays(1));// 日本時間の明日
   }
 }

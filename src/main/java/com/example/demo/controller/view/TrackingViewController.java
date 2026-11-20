@@ -1,5 +1,6 @@
 package com.example.demo.controller.view;
 
+import com.example.demo.dto.DeliveryRules;
 import com.example.demo.dto.DeliveryStatusResponse;
 import com.example.demo.exception.NotFoundException;
 import com.example.demo.service.DeliveryService;
@@ -16,9 +17,6 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Controller
 @RequestMapping("/tracking")
 public class TrackingViewController {
-
-  // 伝票番号の形（数字12桁）
-  private static final String TRACKING_NUMBER_PATTERN = "^[0-9]{12}$";
 
   private final DeliveryService deliveryService;
 
@@ -38,7 +36,7 @@ public class TrackingViewController {
       RedirectAttributes redirectAttributes) {
     String input = trackingNumber.strip();// 前後の空白を取る（コピーしたときに空白が付いてくることがあるため）
 
-    if (!input.matches(TRACKING_NUMBER_PATTERN)) {
+    if (!DeliveryRules.isTrackingNumber(input)) {// 伝票番号の形（数字12桁）は DeliveryRules に1か所でまとめている
       return backToInput(redirectAttributes, input, "配送番号は12桁の数字で入力してください");
     }
 

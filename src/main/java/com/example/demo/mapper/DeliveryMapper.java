@@ -32,13 +32,17 @@ public interface DeliveryMapper {
   @Select("SELECT COUNT(*) FROM deliveries")
   long count();
 
+  // ドライバーの担当で、指定した日に配る配送物を取得する
+  // 並び順は、ドライバーが配る順番（時間帯の早い順）。同じ時間帯なら id 順
+  // 「午前中」は文字の並びでは数字（12:00-14:00 など）より後ろに来てしまうので、CASE で一番前に出してから、残りを時間帯の文字で並べる
+  // 時間帯は「12:00-14:00」のように先頭の時刻が2桁の数字なので、文字の並び＝時刻の早い順になる
   @Select("""
       SELECT id, tracking_number, name, address, call_number, email, status, item_type,
              driver_id, delivery_date, delivery_time, created_at, updated_at
       FROM deliveries
       WHERE driver_id = #{driverId}
       AND delivery_date = #{deliveryDate}
-      ORDER BY delivery_date, id
+      ORDER BY CASE WHEN delivery_time = '午前中' THEN 0 ELSE 1 END, delivery_time, id
       LIMIT #{limit} OFFSET #{offset}
       """)
   List<Delivery> findByDriverId(@Param("driverId") long driverId, @Param("deliveryDate") LocalDate deliveryDate,

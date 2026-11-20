@@ -1,5 +1,6 @@
 package com.example.demo.controller.view;
 
+import com.example.demo.dto.DeliveryRules;
 import com.example.demo.dto.AssignDriverRequest;
 import com.example.demo.dto.DeliveryDetailResponse;
 import com.example.demo.dto.DeliveryResponse;
@@ -22,9 +23,6 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Controller
 @RequestMapping("/admin/deliveries/{trackingNumber}") // URLの {trackingNumber} の部分を、下のメソッドで @PathVariable として受け取る
 public class AdminDeliveryDetailViewController {
-
-  // 伝票番号の形（数字12桁）
-  private static final String TRACKING_NUMBER_PATTERN = "^[0-9]{12}$";
 
   private final DeliveryService deliveryService;
   private final DriverService driverService;
@@ -83,7 +81,7 @@ public class AdminDeliveryDetailViewController {
 
   // 伝票番号が12桁の数字でなければ、DBを探さずに404にする
   private void checkTrackingNumber(String trackingNumber) {
-    if (!trackingNumber.matches(TRACKING_NUMBER_PATTERN)) {
+    if (!DeliveryRules.isTrackingNumber(trackingNumber)) {// 伝票番号の形（数字12桁）は DeliveryRules に1か所でまとめている
       throw new NotFoundException("該当する配送物が見つかりません");
     }
   }

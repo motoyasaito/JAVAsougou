@@ -22,13 +22,15 @@ import com.example.demo.mapper.UserMapper;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.Spy;
+import com.example.demo.support.FixedClockConfig;
+import java.time.Clock;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -44,6 +46,9 @@ class DeliveryServiceTest {
 
   @Mock
   UserMapper userMapper;
+
+  @Spy
+  Clock clock = FixedClockConfig.fixedClock();// 決まった日（2026-11-20）の時計。@Spy にすると、@InjectMocks のコンストラクタに渡される
 
   @InjectMocks
   DeliveryService deliveryService;// 本物のServiceを作り、コンストラクタに上の偽物3つ（MapperとGenerator）を渡す
@@ -128,7 +133,7 @@ class DeliveryServiceTest {
   @Test
   void ドライバー一覧_日付を省略したら日本時間の今日の配達一覧を取得する() {
     // Given
-    LocalDate today = LocalDate.now(ZoneId.of("Asia/Tokyo"));
+    LocalDate today = FixedClockConfig.TODAY;
     when(deliveryMapper.findByDriverId(1L, today, 10, 0L)).thenReturn(List.of());
     // When
     deliveryService.findByDriver(1L, null, 0, 10);

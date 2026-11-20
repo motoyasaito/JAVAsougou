@@ -93,7 +93,10 @@
             <%-- 割り当てられるのは発送準備中のときだけ（Service と同じルール）。それ以外はフォームを出さない --%>
             <c:when test="${delivery.status == 'PREPARING'}">
               <%-- 割り当ては POST で送る。送り先は /admin/deliveries/{伝票番号}/driver --%>
-              <form action="/admin/deliveries/${delivery.trackingNumber}/driver" method="post" class="inline-form">
+              <%-- onsubmit：送るときに「割り振る」ボタンを押せなくして、ダブルクリックで2回送られるのを防ぐ --%>
+              <%-- 押せなくなるのは送信中だけ。詳細画面が開き直すとまた押せるので、別のドライバーへの割り振り直しはできる --%>
+              <form action="/admin/deliveries/${delivery.trackingNumber}/driver" method="post" class="inline-form"
+                    onsubmit="this.querySelector('button[type=submit]').disabled = true;">
                 <label for="driverId" class="form-label">ドライバー</label>
                 <select id="driverId" name="driverId" class="input" required>
                   <%-- value="" の選択肢は「まだ選んでいない」。required があるので、このまま押すとブラウザが止める --%>

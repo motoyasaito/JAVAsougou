@@ -20,7 +20,8 @@ import com.example.demo.exception.ConflictException;
 import com.example.demo.exception.NotFoundException;
 import com.example.demo.service.RedeliveryService;
 import java.time.LocalDate;
-import java.time.ZoneId;
+import com.example.demo.support.FixedClockConfig;
+import org.springframework.context.annotation.Import;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -31,10 +32,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 @WebMvcTest(RedeliveryRequestViewController.class)
+@Import(FixedClockConfig.class) // 本物の時計の代わりに、決まった日の時計を使う
 class RedeliveryRequestViewControllerTest {
 
-  // 明日（日本時間）。希望日は明日以降しか選べないので、テストでも明日を使う
-  private static final LocalDate TOMORROW = LocalDate.now(ZoneId.of("Asia/Tokyo")).plusDays(1);
+  // 明日（決まった日 2026-11-20 の次の日）。希望日は明日以降しか選べないので、テストでも明日を使う
+  private static final LocalDate TOMORROW = FixedClockConfig.TODAY.plusDays(1);
 
   @Autowired
   private MockMvc mockMvc;

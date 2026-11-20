@@ -113,8 +113,8 @@
             <div class="form-field">
               <select id="deliveryTime" name="deliveryTime" class="input ${not empty fieldErrors.deliveryTime ? 'is-invalid' : ''}">
                 <option value="">選択してください</option>
-                <%-- 選べる時間帯は、CreateDeliveryRequest の入力チェックと同じ5つ --%>
-                <c:forEach var="time" items="午前中,12:00-14:00,14:00-16:00,16:00-18:00,18:00-20:00">
+                <%-- 選べる時間帯は DeliveryRules.DELIVERY_TIMES（入力チェックと同じ。ViewConfig で全画面に配っている） --%>
+                <c:forEach var="time" items="${deliveryTimes}">
                   <option value="${time}" ${param.deliveryTime == time ? 'selected' : ''}>${time}</option>
                 </c:forEach>
               </select>

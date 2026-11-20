@@ -85,6 +85,6 @@ class TrackingViewControllerTest {
     mockMvc.perform(get("/tracking/status").param("trackingNumber", "100000000005"))
         .andExpect(status().isInternalServerError())
         .andExpect(view().name("common/error"))
-        .andExpect(model().attribute("adminPage", false));// 管理者のメニューを出さない
+        .andExpect(model().attribute("area", "public"));// お客さん向けの外枠にして、管理者のメニューを出さない
   }
 }

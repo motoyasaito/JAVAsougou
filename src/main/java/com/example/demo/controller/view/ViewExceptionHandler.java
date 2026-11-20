@@ -47,9 +47,9 @@ public class ViewExceptionHandler {
   // エラー画面に渡す値をそろえる
   private String errorPage(HttpServletRequest request, Model model, String message) {
     model.addAttribute("message", message);
-    // 管理者の画面（/admin で始まる）なら管理者用の外枠、それ以外（お客さんの画面）なら、メニューのない外枠にする
-    // お客さんに、管理者のメニューやログアウトを見せないため
-    model.addAttribute("adminPage", request.getRequestURI().startsWith("/admin"));
+    // URL から外枠を決める（/admin：管理者、/driver：ドライバー、それ以外：お客さん）
+    // お客さんに、管理者のメニューや社内の名前を見せないため
+    model.addAttribute("area", ErrorPageArea.from(request.getRequestURI()));
     return "common/error";// /WEB-INF/jsp/common/error.jsp を表示する
   }
 }

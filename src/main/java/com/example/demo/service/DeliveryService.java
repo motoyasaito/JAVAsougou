@@ -12,7 +12,7 @@ import com.example.demo.mapper.UserMapper;
 import com.example.demo.dto.AssignDriverRequest;
 import com.example.demo.exception.ConflictException;
 
-import java.time.ZoneId;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -24,12 +24,14 @@ public class DeliveryService {
   private final DeliveryMapper deliveryMapper;
   private final TrackingNumberGenerator trackingNumberGenerator;// 伝票番号を作る道具。@Componentが付いているので、Springがコンストラクタに渡してくれる
   private final UserMapper userMapper;
+  private final Clock clock;// 「今」を知る時計（TimeConfig で日本時間にしている）。テストでは決まった日の時計を渡せる
 
   public DeliveryService(DeliveryMapper deliveryMapper, TrackingNumberGenerator trackingNumberGenerator,
-      UserMapper userMapper) {
+      UserMapper userMapper, Clock clock) {
     this.deliveryMapper = deliveryMapper;
     this.trackingNumberGenerator = trackingNumberGenerator;
     this.userMapper = userMapper;
+    this.clock = clock;
   }
 
   // 配送物の一覧を、page（0から始まるページ番号）とsize（1ページの件数）で取得する
@@ -47,7 +49,7 @@ public class DeliveryService {
   public PageResponse<DeliveryResponse> findByDriver(long driverId, LocalDate deliveryDate, int page, int size) {
     LocalDate targetDate;
     if (deliveryDate == null) {
-      targetDate = LocalDate.now(ZoneId.of("Asia/Tokyo"));
+      targetDate = LocalDate.now(clock);// 日本時間の今日
     } else {
       targetDate = deliveryDate;
     }

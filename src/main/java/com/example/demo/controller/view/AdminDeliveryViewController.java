@@ -1,5 +1,6 @@
 package com.example.demo.controller.view;
 
+import com.example.demo.dto.DeliveryRules;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.service.DeliveryService;
@@ -20,9 +21,6 @@ public class AdminDeliveryViewController {
 
   // 画面の1ページの件数。画面では件数を選ばせないので固定にする
   private static final int PAGE_SIZE = 10;
-
-  // 伝票番号の形（数字12桁）。APIの入力チェックと同じ決まり
-  private static final String TRACKING_NUMBER_PATTERN = "^[0-9]{12}$";
 
   private final DeliveryService deliveryService;// APIと同じServiceを使う。業務のルールは1か所にまとめたまま
 
@@ -50,7 +48,7 @@ public class AdminDeliveryViewController {
 
     // 形が違う、または見つからないときは、一覧に戻してメッセージを出す
     String errorMessage = null;
-    if (!input.matches(TRACKING_NUMBER_PATTERN)) {// matches は「文字列が正規表現の形に合っているか」を調べる
+    if (!DeliveryRules.isTrackingNumber(input)) {// 伝票番号の形（数字12桁）は DeliveryRules に1か所でまとめている
       errorMessage = "伝票番号は12桁の数字で入力してください";
     } else if (!deliveryService.existsByTrackingNumber(input)) {
       errorMessage = "該当する配送物が見つかりません";
