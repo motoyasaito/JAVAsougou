@@ -1,7 +1,9 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.AssignDriverRequest;
 import com.example.demo.dto.CreateDeliveryRequest;
 import com.example.demo.dto.DeliveryResponse;
+import com.example.demo.dto.DeliveryRules;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.service.DeliveryService;
 
@@ -57,7 +59,16 @@ public class AdminDeliveryController {
   // @PathVariable：URLの {trackingNumber} の部分を、同じ名前の引数で受け取る
   // @Pattern：12桁の数字でなければ400になる（一覧の@Min・@Maxと同じく、引数に直接付けられる）
   public DeliveryResponse findByTrackingNumber(
-      @PathVariable @Pattern(regexp = "^[0-9]{12}$", message = "伝票番号は12桁の数字で入力してください") String trackingNumber) {
+      @PathVariable @Pattern(regexp = DeliveryRules.TRACKING_NUMBER_PATTERN, message = "伝票番号は12桁の数字で入力してください") String trackingNumber) {
     return deliveryService.findByTrackingNumber(trackingNumber);// Serviceに取得を任せて、結果をそのまま返す（ステータスは自動で200）
+  }
+
+  // 配送物に担当ドライバーを割り振る。割り振れたら200（中身なし）を返す
+  @PostMapping("/{id}/driver")
+  public ResponseEntity<Void> assignDriver(
+      @PathVariable long id,
+      @RequestBody @Valid AssignDriverRequest request) {
+    deliveryService.assignDriver(id, request);
+    return ResponseEntity.ok().build();
   }
 }

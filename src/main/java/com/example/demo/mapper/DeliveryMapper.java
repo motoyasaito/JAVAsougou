@@ -2,8 +2,11 @@ package com.example.demo.mapper;
 
 import com.example.demo.entity.Delivery;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
@@ -14,12 +17,13 @@ import org.apache.ibatis.annotations.Update;
 @Mapper
 public interface DeliveryMapper {
 
-  // 配送物を日付順に、指定した件数（limit）だけ、指定した位置（offset）から取得する
+  // 配送物を登録の新しい順に、指定した件数（limit）だけ、指定した位置（offset）から取得する
+  // 登録日時が同じとき（data.sql でまとめて入れたときなど）は、id の大きい順（あとから入れた順）にする
   @Select("""
       SELECT id, tracking_number, name, address, call_number, email, status, item_type,
              driver_id, delivery_date, delivery_time, created_at, updated_at
       FROM deliveries
-      ORDER BY delivery_date, id
+      ORDER BY created_at DESC, id DESC
       LIMIT #{limit} OFFSET #{offset}
       """)
   List<Delivery> findAll(@Param("limit") int limit, @Param("offset") long offset);
@@ -28,13 +32,17 @@ public interface DeliveryMapper {
   @Select("SELECT COUNT(*) FROM deliveries")
   long count();
 
+  // ドライバーの担当で、指定した日に配る配送物を取得する
+  // 並び順は、ドライバーが配る順番（時間帯の早い順）。同じ時間帯なら id 順
+  // 「午前中」は文字の並びでは数字（12:00-14:00 など）より後ろに来てしまうので、CASE で一番前に出してから、残りを時間帯の文字で並べる
+  // 時間帯は「12:00-14:00」のように先頭の時刻が2桁の数字なので、文字の並び＝時刻の早い順になる
   @Select("""
       SELECT id, tracking_number, name, address, call_number, email, status, item_type,
              driver_id, delivery_date, delivery_time, created_at, updated_at
       FROM deliveries
       WHERE driver_id = #{driverId}
       AND delivery_date = #{deliveryDate}
-      ORDER BY delivery_date, id
+      ORDER BY CASE WHEN delivery_time = '午前中' THEN 0 ELSE 1 END, delivery_time, id
       LIMIT #{limit} OFFSET #{offset}
       """)
   List<Delivery> findByDriverId(@Param("driverId") long driverId, @Param("deliveryDate") LocalDate deliveryDate,
@@ -76,6 +84,28 @@ public interface DeliveryMapper {
       """)
   Optional<Delivery> findByTrackingNumber(@Param("trackingNumber") String trackingNumber);
 
+  // 配送状況確認（A008・お客さんの配送状況の画面）用に、伝票番号で配送物を1件取得する
+  // 配達予定日と時間帯は、再配達があれば「最新の再配達」の日付と時間帯、なければ最初の配達日と時間帯にする
+  // （B002・A014 と同じ「再配達があれば最新の再配達日」という考え方。日付と時間帯は同じ1行から取って、ちぐはぐにしない）
+  // LEFT JOIN LATERAL：配送物1件ごとに、カッコの中の SELECT（その配送物の最新の再配達を1行だけ取る）を実行して横につなげる
+  //   LEFT なので、再配達がない配送物も消えずに残る（そのときの r の値は NULL）
+  // COALESCE(a, b)：a が NULL なら b を使う
+  @Select("""
+      SELECT d.tracking_number, d.status,
+             COALESCE(r.redelivery_date, d.delivery_date) AS delivery_date,
+             CASE WHEN r.id IS NULL THEN d.delivery_time ELSE r.redelivery_time END AS delivery_time
+      FROM deliveries d
+      LEFT JOIN LATERAL (
+          SELECT id, redelivery_date, redelivery_time
+          FROM redeliveries
+          WHERE delivery_id = d.id
+          ORDER BY redelivery_date DESC NULLS LAST, id DESC
+          LIMIT 1
+      ) r ON true
+      WHERE d.tracking_number = #{trackingNumber}
+      """)
+  Optional<Delivery> findStatusByTrackingNumber(@Param("trackingNumber") String trackingNumber);
+
   // idで配送物のステータスを変更する
   @Update("""
       UPDATE deliveries
@@ -83,4 +113,18 @@ public interface DeliveryMapper {
       WHERE id = #{id}
       """)
   int updateStatus(@Param("id") long id, @Param("status") String status);
+
+  @Delete("""
+        DELETE FROM deliveries
+        WHERE status = 'DELIVERED' AND updated_at < #{threshold}
+      """)
+  int deleteCompleted(@Param("threshold") LocalDateTime threshold);
+
+  // idで配送物の担当ドライバーを変更する
+  @Update("""
+        UPDATE deliveries
+        SET driver_id = #{driverId}, updated_at = now()
+        WHERE id = #{id}
+      """)
+  int updateDriverById(@Param("id") long id, @Param("driverId") Long driverId);
 }

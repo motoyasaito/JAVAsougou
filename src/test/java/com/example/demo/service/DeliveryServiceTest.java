@@ -6,20 +6,31 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
+
+import com.example.demo.dto.AssignDriverRequest;
 import com.example.demo.dto.CreateDeliveryRequest;
 
+import com.example.demo.dto.DeliveryDetailResponse;
 import com.example.demo.dto.DeliveryResponse;
+import com.example.demo.dto.DeliveryStatusResponse;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.entity.Delivery;
+import com.example.demo.exception.ConflictException;
 import com.example.demo.exception.NotFoundException;
 import com.example.demo.mapper.DeliveryMapper;
+import com.example.demo.mapper.UserMapper;
+
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.Spy;
+import com.example.demo.support.FixedClockConfig;
+import java.time.Clock;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -33,8 +44,14 @@ class DeliveryServiceTest {
   @Mock
   TrackingNumberGenerator trackingNumberGenerator;// 伝票番号を作る道具の偽物。本物は毎回ランダムなので、決まった番号を返させる
 
+  @Mock
+  UserMapper userMapper;
+
+  @Spy
+  Clock clock = FixedClockConfig.fixedClock();// 決まった日（2026-11-20）の時計。@Spy にすると、@InjectMocks のコンストラクタに渡される
+
   @InjectMocks
-  DeliveryService deliveryService;// 本物のServiceを作り、コンストラクタに上の偽物2つ（MapperとGenerator）を渡す
+  DeliveryService deliveryService;// 本物のServiceを作り、コンストラクタに上の偽物3つ（MapperとGenerator）を渡す
 
   // ---------- 管理者の配送物一覧（findAll） ----------
 
@@ -116,7 +133,7 @@ class DeliveryServiceTest {
   @Test
   void ドライバー一覧_日付を省略したら日本時間の今日の配達一覧を取得する() {
     // Given
-    LocalDate today = LocalDate.now(ZoneId.of("Asia/Tokyo"));
+    LocalDate today = FixedClockConfig.TODAY;
     when(deliveryMapper.findByDriverId(1L, today, 10, 0L)).thenReturn(List.of());
     // When
     deliveryService.findByDriver(1L, null, 0, 10);
@@ -250,10 +267,142 @@ class DeliveryServiceTest {
         .hasMessage("該当する配送物が見つかりません");// メッセージも確かめる。GlobalExceptionHandlerがこの文字をレスポンスに入れるため
   }
 
+  @Test
+  void 配送状況_伝票番号で配送状況を取得してDTOに変換して返す() {
+    // Given
+    Delivery delivery = new Delivery();
+    delivery.setTrackingNumber("123456789012");
+    delivery.setDeliveryDate(LocalDate.of(2026, 11, 7));
+    delivery.setDeliveryTime("午前中");
+    delivery.setStatus("IN TRANSIT");
+    when(deliveryMapper.findStatusByTrackingNumber("123456789012")).thenReturn(Optional.of(delivery));
+
+    //When
+    DeliveryStatusResponse result = deliveryService.findStatusByTrackingNumber("123456789012");
+
+    //Then
+    assertThat(result.trackingNumber()).isEqualTo("123456789012");
+    assertThat(result.deliveryDate()).isEqualTo(LocalDate.of(2026, 11, 7));
+    assertThat(result.deliveryTime()).isEqualTo("午前中");
+    assertThat(result.status()).isEqualTo("IN TRANSIT");
+  }
+
+  @Test
+  void 配送状況_伝票番号が見つからなければ404の例外を投げる() {
+    // Given
+    when(deliveryMapper.findStatusByTrackingNumber("999999999999")).thenReturn(Optional.empty());
+
+    // When / Then
+    assertThatThrownBy(() -> deliveryService.findStatusByTrackingNumber("999999999999"))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("該当する配送物が見つかりません");
+  }
+
   // テストで使う登録リクエストを作る（2つのテストで同じものを使うのでメソッドにまとめる）
   private CreateDeliveryRequest createRequest() {
     // recordは new クラス名(値, …) で作れる。値はrecordに書いた項目の順番（氏名・住所・電話・メール・種類・配達日・時間帯）で並べる
     return new CreateDeliveryRequest("山田太郎", "東京都千代田区1-1", "09012345678", "taro@example.com", "NORMAL",
         LocalDate.of(2026, 10, 28), "午前中");
+  }
+
+  // ---------- 担当ドライバーの割り振り（assignDriver） ----------
+  @Test
+  void 割り振り_発送準備中なら担当ドライバーを更新する() {
+    // Given
+    Delivery delivery = new Delivery();
+    delivery.setId(1L);
+    delivery.setStatus("PREPARING");
+    when(deliveryMapper.findById(1L)).thenReturn(Optional.of(delivery));
+    when(userMapper.existsDriverById(2L)).thenReturn(true);
+
+    // When
+    deliveryService.assignDriver(1L, new AssignDriverRequest(2L));
+
+    // Then
+    verify(deliveryMapper).updateDriverById(1L, 2L);
+  }
+
+  @Test
+  void 配送物が見つからない場合404を投げる() {
+    // Given
+    when(deliveryMapper.findById(1L)).thenReturn(Optional.empty());
+
+    // When/Then
+    assertThatThrownBy(() -> deliveryService.assignDriver(1L, new AssignDriverRequest(2L)))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("該当する配送物が見つかりません");
+  }
+
+  @Test
+  void ドライバーではない場合404を投げる() {
+    // Given
+    Delivery delivery = new Delivery();
+    delivery.setId(1L);
+    delivery.setStatus("PREPARING");
+    when(deliveryMapper.findById(1L)).thenReturn(Optional.of(delivery));
+    when(userMapper.existsDriverById(1L)).thenReturn(false);
+
+    assertThatThrownBy(() -> deliveryService.assignDriver(1, new AssignDriverRequest(1L)))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("該当するドライバーが見つかりません");
+  }
+
+  @Test
+  void 発送準備中でない場合409を投げる() {
+    // Given
+    Delivery delivery = new Delivery();
+    delivery.setStatus("IN TRANSIT");
+    when(deliveryMapper.findById(1L)).thenReturn(Optional.of(delivery));
+    when(userMapper.existsDriverById(2L)).thenReturn(true);
+
+    // When/Then
+    assertThatThrownBy(() -> deliveryService.assignDriver(1L, new AssignDriverRequest(2L)))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("発送準備中の配送物のみ担当を割り振れます");
+  }
+
+  // ---------- 管理者の詳細画面（findDetailByTrackingNumber） ----------
+
+  @Test
+  void 詳細画面_配送物と登録日時と最終更新日時を返す() {
+    Delivery delivery = new Delivery();
+    delivery.setId(1L);
+    delivery.setTrackingNumber("100000000001");
+    delivery.setStatus("PREPARING");
+    delivery.setCreatedAt(LocalDateTime.of(2026, 10, 20, 10, 15));
+    delivery.setUpdatedAt(LocalDateTime.of(2026, 10, 21, 9, 0));
+    when(deliveryMapper.findByTrackingNumber("100000000001")).thenReturn(Optional.of(delivery));
+
+    DeliveryDetailResponse result = deliveryService.findDetailByTrackingNumber("100000000001");
+
+    assertThat(result.delivery().trackingNumber()).isEqualTo("100000000001");
+    assertThat(result.delivery().status()).isEqualTo("PREPARING");
+    assertThat(result.createdAt()).isEqualTo(LocalDateTime.of(2026, 10, 20, 10, 15));
+    assertThat(result.updatedAt()).isEqualTo(LocalDateTime.of(2026, 10, 21, 9, 0));
+  }
+
+  @Test
+  void 詳細画面_見つからなければ404を投げる() {
+    when(deliveryMapper.findByTrackingNumber("999999999999")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> deliveryService.findDetailByTrackingNumber("999999999999"))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("該当する配送物が見つかりません");
+  }
+
+  // ---------- 伝票番号の存在確認（existsByTrackingNumber） ----------
+
+  @Test
+  void 存在確認_配送物があればtrueを返す() {
+    when(deliveryMapper.existsByTrackingNumber("100000000001")).thenReturn(true);
+
+    assertThat(deliveryService.existsByTrackingNumber("100000000001")).isTrue();
+  }
+
+  @Test
+  void 存在確認_配送物がなければfalseを返す() {
+    when(deliveryMapper.existsByTrackingNumber("999999999999")).thenReturn(false);
+
+    assertThat(deliveryService.existsByTrackingNumber("999999999999")).isFalse();
   }
 }
