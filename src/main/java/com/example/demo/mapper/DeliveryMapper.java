@@ -80,6 +80,28 @@ public interface DeliveryMapper {
       """)
   Optional<Delivery> findByTrackingNumber(@Param("trackingNumber") String trackingNumber);
 
+  // 配送状況確認（A008・お客さんの配送状況の画面）用に、伝票番号で配送物を1件取得する
+  // 配達予定日と時間帯は、再配達があれば「最新の再配達」の日付と時間帯、なければ最初の配達日と時間帯にする
+  // （B002・A014 と同じ「再配達があれば最新の再配達日」という考え方。日付と時間帯は同じ1行から取って、ちぐはぐにしない）
+  // LEFT JOIN LATERAL：配送物1件ごとに、カッコの中の SELECT（その配送物の最新の再配達を1行だけ取る）を実行して横につなげる
+  //   LEFT なので、再配達がない配送物も消えずに残る（そのときの r の値は NULL）
+  // COALESCE(a, b)：a が NULL なら b を使う
+  @Select("""
+      SELECT d.tracking_number, d.status,
+             COALESCE(r.redelivery_date, d.delivery_date) AS delivery_date,
+             CASE WHEN r.id IS NULL THEN d.delivery_time ELSE r.redelivery_time END AS delivery_time
+      FROM deliveries d
+      LEFT JOIN LATERAL (
+          SELECT id, redelivery_date, redelivery_time
+          FROM redeliveries
+          WHERE delivery_id = d.id
+          ORDER BY redelivery_date DESC NULLS LAST, id DESC
+          LIMIT 1
+      ) r ON true
+      WHERE d.tracking_number = #{trackingNumber}
+      """)
+  Optional<Delivery> findStatusByTrackingNumber(@Param("trackingNumber") String trackingNumber);
+
   // idで配送物のステータスを変更する
   @Update("""
       UPDATE deliveries

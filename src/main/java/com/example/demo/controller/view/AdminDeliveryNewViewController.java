@@ -5,13 +5,10 @@ import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.service.DeliveryService;
 
 import jakarta.validation.Valid;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
-import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -50,7 +47,7 @@ public class AdminDeliveryNewViewController {
     if (bindingResult.hasErrors()) {
       // 間違いがあれば登録せずに、同じ登録画面をもう一度表示する。項目ごとのメッセージを渡す
       // ここはリダイレクトしない。リダイレクトすると、入力した値が消えてしまうため
-      model.addAttribute("fieldErrors", toFieldErrors(bindingResult));
+      model.addAttribute("fieldErrors", FieldErrors.from(bindingResult));// 項目ごとのメッセージの形にする（FieldErrors は画面で共通の道具）
       return "admin/deliveryNew";
     }
 
@@ -60,17 +57,5 @@ public class AdminDeliveryNewViewController {
     redirectAttributes.addFlashAttribute("successMessage",
         "荷物を登録しました（伝票番号：" + created.trackingNumber() + "）");
     return "redirect:/admin/deliveries/" + created.trackingNumber();// リダイレクトして、再読み込みで二重に登録されないようにする（PRGパターン）
-  }
-
-  // 入力チェックの結果を「項目名 → メッセージ」の形にする。JSP で項目ごとに出しやすくするため
-  private Map<String, String> toFieldErrors(BindingResult bindingResult) {
-    Map<String, String> fieldErrors = new LinkedHashMap<>();// LinkedHashMap：入れた順番を覚えておく Map
-    for (FieldError error : bindingResult.getFieldErrors()) {
-      // isBindingFailure()：値の型が合わなかったとき（日付に「abc」など）。Springの英語のメッセージは出さず、決まった文にする
-      String message = error.isBindingFailure() ? "形式が正しくありません" : error.getDefaultMessage();
-      // 1つの項目に間違いが複数あっても、最初の1つだけを出す（putIfAbsent：まだ入っていないときだけ入れる）
-      fieldErrors.putIfAbsent(error.getField(), message);
-    }
-    return fieldErrors;
   }
 }

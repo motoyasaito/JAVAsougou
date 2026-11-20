@@ -439,6 +439,190 @@ textarea.input {
   margin: 16px 0;
 }
 
+/* ---------- お客さん用の画面 ---------- */
+.public-header {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  background: var(--color-sidebar);
+}
+
+.public-brand {
+  color: #ffffff;
+  font-weight: bold;
+  font-size: 16px;
+  text-decoration: none;
+}
+
+.public-content {
+  max-width: 640px;
+  margin: 48px auto;
+  padding: 0 16px;
+}
+
+.public-card {
+  padding: 32px;
+}
+
+.public-title {
+  margin: 0 0 8px;
+  font-size: 22px;
+  text-align: center;
+}
+
+.public-lead {
+  margin: 0 0 24px;
+  text-align: center;
+  color: var(--color-text-sub);
+}
+
+.tracking-form {
+  display: flex;
+  gap: 8px;
+}
+
+.tracking-input {
+  flex: 1;               /* 入力欄を、ボタン以外の幅いっぱいに広げる */
+  font-size: 16px;       /* スマホで入力欄を押したときに、画面が勝手に拡大されないようにする */
+  letter-spacing: 0.05em;
+}
+
+.public-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+/* お客さん用の画面の入力欄は、ラベルを少し狭くする */
+.public-card .form-row {
+  grid-template-columns: 120px 1fr;
+}
+
+.button-wide {
+  min-width: 200px;
+}
+
+/* モーダル（dialog タグ） */
+.modal {
+  width: min(480px, calc(100% - 32px)); /* 画面が狭いときは、左右に16pxずつ余白を残す */
+  padding: 28px;
+  border: none;
+  border-radius: var(--radius);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.25);
+}
+
+/* モーダルの後ろの画面を暗くする */
+.modal::backdrop {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.modal-title {
+  margin: 0 0 20px;
+  font-size: 18px;
+  text-align: center;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.modal-actions form {
+  margin: 0;
+}
+
+/* 画面には見せず、読み上げソフトには読ませる（入力欄のラベルなど） */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* 進み具合（発送準備中 → 配達中 → 配達完了） */
+.steps {
+  display: flex;
+  margin: 32px 0 16px;
+  padding: 0;
+  list-style: none;      /* ol の番号を消す */
+}
+
+.step {
+  flex: 1;
+  position: relative;
+  text-align: center;
+  color: var(--color-text-sub);
+}
+
+/* 丸と丸をつなぐ線。2つ目からは、左側（前の段階）に線を引く */
+.step + .step::before {
+  content: "";
+  position: absolute;
+  top: 11px;
+  right: 50%;
+  width: 100%;
+  height: 3px;
+  background: var(--color-border);
+  z-index: 0;            /* 線は奥に描く */
+}
+
+.step-dot {
+  position: relative;
+  z-index: 1;            /* 丸は線より手前に描く。z-index は数字が大きいほど手前。指定しないと、後ろの段階の線が前の段階の丸に重なる */
+  display: block;
+  width: 24px;
+  height: 24px;
+  margin: 0 auto 8px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid var(--color-border);
+}
+
+.step.is-done .step-dot,
+.step.is-current .step-dot {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.step.is-done::before,
+.step.is-current::before {
+  background: var(--color-primary) !important;
+}
+
+.step.is-current .step-label {
+  color: var(--color-text);
+  font-weight: bold;
+}
+
+.step.is-absent .step-dot {
+  border-color: var(--color-error);
+  background: var(--color-error);
+}
+
+.step.is-absent .step-label {
+  color: var(--color-error);
+}
+
+.status-message {
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: #eff6ff;
+  color: #1e40af;
+  text-align: center;
+}
+
+.status-message.is-absent {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
 /* ---------- 狭い画面（スマホなど） ---------- */
 @media (max-width: 768px) {
   .layout {

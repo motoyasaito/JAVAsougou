@@ -111,8 +111,9 @@ public class DeliveryService {
   }
 
   // 伝票番号で配送状況を取得する。見つからなければ404にする
+  // 配達予定日と時間帯は、再配達があれば最新の再配達のもの（Mapper の findStatusByTrackingNumber で決めている）
   public DeliveryStatusResponse findStatusByTrackingNumber(String trackingNumber) {
-    Delivery delivery = deliveryMapper.findByTrackingNumber(trackingNumber)
+    Delivery delivery = deliveryMapper.findStatusByTrackingNumber(trackingNumber)
         .orElseThrow(() -> new NotFoundException("該当する配送物が見つかりません"));
     return DeliveryStatusResponse.from(delivery);
   }

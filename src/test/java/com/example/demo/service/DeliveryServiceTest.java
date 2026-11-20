@@ -268,8 +268,9 @@ class DeliveryServiceTest {
     Delivery delivery = new Delivery();
     delivery.setTrackingNumber("123456789012");
     delivery.setDeliveryDate(LocalDate.of(2026, 11, 7));
+    delivery.setDeliveryTime("午前中");
     delivery.setStatus("IN TRANSIT");
-    when(deliveryMapper.findByTrackingNumber("123456789012")).thenReturn(Optional.of(delivery));
+    when(deliveryMapper.findStatusByTrackingNumber("123456789012")).thenReturn(Optional.of(delivery));
 
     //When
     DeliveryStatusResponse result = deliveryService.findStatusByTrackingNumber("123456789012");
@@ -277,13 +278,14 @@ class DeliveryServiceTest {
     //Then
     assertThat(result.trackingNumber()).isEqualTo("123456789012");
     assertThat(result.deliveryDate()).isEqualTo(LocalDate.of(2026, 11, 7));
+    assertThat(result.deliveryTime()).isEqualTo("午前中");
     assertThat(result.status()).isEqualTo("IN TRANSIT");
   }
 
   @Test
   void 配送状況_伝票番号が見つからなければ404の例外を投げる() {
     // Given
-    when(deliveryMapper.findByTrackingNumber("999999999999")).thenReturn(Optional.empty());
+    when(deliveryMapper.findStatusByTrackingNumber("999999999999")).thenReturn(Optional.empty());
 
     // When / Then
     assertThatThrownBy(() -> deliveryService.findStatusByTrackingNumber("999999999999"))

@@ -141,13 +141,14 @@ class DeliveryControllerTest {
   void 伝票番号で配送状況を取得できる() throws Exception {
     // Given
     DeliveryStatusResponse deliveryStatus = new DeliveryStatusResponse("123456789012", LocalDate.of(2026, 11, 7),
-        "IN TRANSIT");
+        "午前中", "IN TRANSIT");
     when(deliveryService.findStatusByTrackingNumber("123456789012")).thenReturn(deliveryStatus);
     //　When/Then
     mockMvc.perform(get("/api/deliveries/123456789012"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.trackingNumber").value("123456789012"))
         .andExpect(jsonPath("$.deliveryDate").value("2026-11-07"))
+        .andExpect(jsonPath("$.deliveryTime").value("午前中"))
         .andExpect(jsonPath("$.status").value("IN TRANSIT"))
         .andExpect(jsonPath("$.name").doesNotExist())
         .andExpect(jsonPath("$.address").doesNotExist())
