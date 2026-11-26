@@ -2,9 +2,14 @@ package com.example.demo.controller.view;
 
 import com.example.demo.dto.CreateDeliveryRequest;
 import com.example.demo.dto.DeliveryResponse;
+import com.example.demo.exception.BadRequestException;
 import com.example.demo.service.DeliveryService;
 
 import jakarta.validation.Valid;
+
+import java.time.Clock;
+import java.time.LocalDate;
+import java.util.Map;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -22,14 +27,17 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class AdminDeliveryNewViewController {
 
   private final DeliveryService deliveryService;
+  private final Clock clock;
 
-  public AdminDeliveryNewViewController(DeliveryService deliveryService) {
+  public AdminDeliveryNewViewController(DeliveryService deliveryService, Clock clock) {
     this.deliveryService = deliveryService;
+    this.clock = clock;
   }
 
   // 登録画面を表示する（一覧の「＋ 荷物を登録」から来る）
   @GetMapping("/new")
-  public String newForm() {
+  public String newForm(Model model) {
+    addMinDate(model);
     return "admin/deliveryNew";// /WEB-INF/jsp/admin/deliveryNew.jsp を表示する
   }
 
@@ -48,14 +56,26 @@ public class AdminDeliveryNewViewController {
       // 間違いがあれば登録せずに、同じ登録画面をもう一度表示する。項目ごとのメッセージを渡す
       // ここはリダイレクトしない。リダイレクトすると、入力した値が消えてしまうため
       model.addAttribute("fieldErrors", FieldErrors.from(bindingResult));// 項目ごとのメッセージの形にする（FieldErrors は画面で共通の道具）
+      addMinDate(model);
       return "admin/deliveryNew";
     }
 
-    DeliveryResponse created = deliveryService.create(form);// APIと同じServiceで登録する。伝票番号もここで発行される
+    DeliveryResponse created;
+    try {
+      created = deliveryService.create(form);// APIと同じServiceで登録する。伝票番号もここで発行される
+    } catch (BadRequestException e) {
+      model.addAttribute("fieldErrors", Map.of("deliveryDate", e.getMessage()));
+      addMinDate(model);
+      return "admin/deliveryNew";
+    }
 
     // 登録できたら、その配送物の詳細画面へ移る。続けてドライバーを割り当てられるようにするため
     redirectAttributes.addFlashAttribute("successMessage",
         "荷物を登録しました（伝票番号：" + created.trackingNumber() + "）");
     return "redirect:/admin/deliveries/" + created.trackingNumber();// リダイレクトして、再読み込みで二重に登録されないようにする（PRGパターン）
+  }
+
+  private void addMinDate(Model model) {
+    model.addAttribute("minDate", LocalDate.now(clock));
   }
 }

@@ -15,18 +15,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.demo.dto.CreateDeliveryRequest;
 import com.example.demo.dto.DeliveryResponse;
+import com.example.demo.exception.BadRequestException;
 import com.example.demo.service.DeliveryService;
+import com.example.demo.support.FixedClockConfig;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 @WebMvcTest(AdminDeliveryNewViewController.class)
+@Import(FixedClockConfig.class) // 本物の時計の代わりに、決まった日の時計を使う（Controller が配達日の下限 minDate を作るため）
 class AdminDeliveryNewViewControllerTest {
 
   @Autowired
@@ -61,7 +65,8 @@ class AdminDeliveryNewViewControllerTest {
   void 登録画面を開くと登録のJSPを表示する() throws Exception {
     mockMvc.perform(get("/admin/deliveries/new"))
         .andExpect(status().isOk())
-        .andExpect(view().name("admin/deliveryNew"));
+        .andExpect(view().name("admin/deliveryNew"))
+        .andExpect(model().attribute("minDate", FixedClockConfig.TODAY));// カレンダーで選べるいちばん早い日（今日）を渡している
   }
 
   @Test
@@ -107,5 +112,20 @@ class AdminDeliveryNewViewControllerTest {
         .andExpect(model().attribute("fieldErrors", hasEntry("deliveryDate", "形式が正しくありません")));
 
     verify(deliveryService, never()).create(any());
+  }
+
+  @Test
+  void 過去の配達日でServiceに断られたら配達日の欄にメッセージを出す() throws Exception {
+    // Given：Service が「過去の配達日」で断る（入力チェックは通り、Service で見つかるエラー）
+    // Service は偽物なので、送るフォームの日付は何でもよい
+    when(deliveryService.create(any())).thenThrow(new BadRequestException("配達日は今日以降の日付を選択してください"));
+
+    // When / Then：登録画面のまま、配達日の欄の下に出すメッセージ（fieldErrors の deliveryDate）が渡る
+    // minDate（カレンダーで選べるいちばん早い日）も、もう一度渡している
+    mockMvc.perform(validForm())
+        .andExpect(status().isOk())
+        .andExpect(view().name("admin/deliveryNew"))
+        .andExpect(model().attribute("fieldErrors", hasEntry("deliveryDate", "配達日は今日以降の日付を選択してください")))
+        .andExpect(model().attribute("minDate", FixedClockConfig.TODAY));
   }
 }
