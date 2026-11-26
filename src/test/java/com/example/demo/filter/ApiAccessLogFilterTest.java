@@ -51,6 +51,24 @@ class ApiAccessLogFilterTest {
   }
 
   @Test
+  void ステータスが400番台ならエラーの理由も出す(CapturedOutput output) throws Exception {
+    // Given
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/deliveries/999999999999");
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    FilterChain chain = (req, res) -> {
+      req.setAttribute("errorMessage", "該当する配送物が見つかりません []");// GlobalExceptionHandlerがメモした状態を再現する
+      ((HttpServletResponse) res).setStatus(404);
+    };
+
+    // When
+    apiAccessLogFilter.doFilter(request, response, chain);
+
+    // Then
+    assertThat(output).contains("404");
+    assertThat(output).contains("該当する配送物が見つかりません");
+  }
+
+  @Test
   void ステータスが500ならERRORでアクセスログを出す(CapturedOutput output) throws Exception {
     // Given
     MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/deliveries");

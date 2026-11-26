@@ -41,7 +41,8 @@ public class ApiAccessLogFilter extends OncePerRequestFilter {// OncePerRequestF
       if (status >= 500) {// 5xx（システム側の問題）はERROR。500は「400以上」にも当てはまるので、大きいほうから判定する
         accessLog.error(message);
       } else if (status >= 400) {// 4xx（利用者側の誤り）はWARN
-        accessLog.warn(message);
+        Object errorMessage = request.getAttribute("errorMessage");
+        accessLog.warn(message + " " + errorMessage);
       } else {// それ以外（2xxなど）はINFO
         accessLog.info(message);
       }

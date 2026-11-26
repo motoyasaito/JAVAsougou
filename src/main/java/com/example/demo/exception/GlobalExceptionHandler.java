@@ -11,6 +11,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;//@vaidの�
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;//
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -77,7 +79,7 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ErrorResponse> handleConflict(ConflictException e) {
     return build(HttpStatus.CONFLICT, e.getMessage(), List.of());
   }
-  
+
   @ExceptionHandler(BadRequestException.class)
   public ResponseEntity<ErrorResponse> handleBadRequest(BadRequestException e) {
     return build(HttpStatus.BAD_REQUEST, e.getMessage(), List.of());
@@ -90,6 +92,9 @@ public class GlobalExceptionHandler {
   }
 
   private ResponseEntity<ErrorResponse> build(HttpStatus status, String message, List<String> details) {// 2つのメソッドが同じ組み立てになるため、共通メソッドにする。
+    // アクセスログに理由を出すため、今のリクエストにメモしておく。ApiAccessLogFilterが読む
+    RequestContextHolder.currentRequestAttributes()
+        .setAttribute("errorMessage", message + " " + details, RequestAttributes.SCOPE_REQUEST);
     ErrorResponse body = new ErrorResponse(status.value(), status.getReasonPhrase(), message, details);
     return ResponseEntity.status(status).body(body);
   }
