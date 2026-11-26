@@ -2,9 +2,11 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.AssignDriverRequest;
 import com.example.demo.dto.CreateDeliveryRequest;
+import com.example.demo.dto.DeliveryAlertResponse;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.DeliveryRules;
 import com.example.demo.dto.PageResponse;
+import com.example.demo.service.DeliveryAlertService;
 import com.example.demo.service.DeliveryService;
 
 import jakarta.validation.Valid;
@@ -27,9 +29,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminDeliveryController {
 
   private final DeliveryService deliveryService;// 業務の処理を任せるService。finalなので、一度入れたら差し替えられない
+  private final DeliveryAlertService deliveryAlertService;
 
-  public AdminDeliveryController(DeliveryService deliveryService) {// Springが起動時にServiceを作って、ここに渡してくれる（コンストラクタインジェクション）
+  public AdminDeliveryController(DeliveryService deliveryService, DeliveryAlertService deliveryAlertService) {// Springが起動時にServiceを作って、ここに渡してくれる（コンストラクタインジェクション）
     this.deliveryService = deliveryService;// 受け取ったServiceをフィールドに入れて、下のメソッドで使えるようにする
+    this.deliveryAlertService = deliveryAlertService;
   }
 
   // 配送物の一覧を取得する
@@ -70,5 +74,13 @@ public class AdminDeliveryController {
       @RequestBody @Valid AssignDriverRequest request) {
     deliveryService.assignDriver(id, request);
     return ResponseEntity.ok().build();
+  }
+
+  // 未完了配送物の一覧を取得する
+  @GetMapping("/alerts")
+  public PageResponse<DeliveryAlertResponse> findPending(
+      @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
+      @RequestParam(defaultValue = "0") @Min(0) int page) {
+    return deliveryAlertService.findPending(page, size);
   }
 }

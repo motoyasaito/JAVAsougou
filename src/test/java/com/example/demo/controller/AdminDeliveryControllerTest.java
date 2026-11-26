@@ -14,12 +14,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.demo.dto.AssignDriverRequest;
 import com.example.demo.dto.CreateDeliveryRequest;
+import com.example.demo.dto.DeliveryAlertResponse;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.exception.ConflictException;
 import com.example.demo.exception.NotFoundException;
+import com.example.demo.service.DeliveryAlertService;
 import com.example.demo.service.DeliveryService;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +40,9 @@ class AdminDeliveryControllerTest {
 
   @MockitoBean
   DeliveryService deliveryService;// サービスの偽物を作ってコントローラーに返す。
+
+  @MockitoBean
+  DeliveryAlertService deliveryAlertService;
 
   @Test
   void ページと件数を指定すると配送物の一覧を返す() throws Exception {
@@ -279,6 +285,77 @@ class AdminDeliveryControllerTest {
         .andExpect(jsonPath("$.details[0]").value("trackingNumber:伝票番号は12桁の数字で入力してください"));
 
     verify(deliveryService, never()).findByTrackingNumber(any());
+  }
+
+  // ---------- 未完了配送物の一覧（GET /alerts） ----------
+
+  @Test
+  void 未完了一覧_ページと件数を指定すると配送物一覧を返す() throws Exception {
+    // Given
+    DeliveryAlertResponse deliveryAlertResponse = new DeliveryAlertResponse("山田太郎", "123456789012", "IN TRANSIT",
+        LocalDate.of(2026, 11, 11), 1L, LocalDate.of(2026, 11, 17), LocalDateTime.of(2026, 11, 16, 10, 0));
+    when(deliveryAlertService.findPending(1, 5)).thenReturn(PageResponse.of(List.of(deliveryAlertResponse), 1, 5, 6L));
+
+    // When / Then
+    mockMvc.perform(get("/api/admin/deliveries/alerts")
+        .param("page", "1")
+        .param("size", "5"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].name").value("山田太郎"))
+        .andExpect(jsonPath("$.content[0].trackingNumber").value("123456789012"))
+        .andExpect(jsonPath("$.content[0].detectedDate").value("2026-11-17"))
+        .andExpect(jsonPath("$.content[0].deliveryDate").value("2026-11-11"))
+        .andExpect(jsonPath("$.page").value(1))
+        .andExpect(jsonPath("$.size").value(5))
+        .andExpect(jsonPath("$.totalElements").value(6))
+        .andExpect(jsonPath("$.totalPages").value(2));
+  }
+
+  @Test
+  void 未完了一覧_ページ指定を省略したら既定値でServiceを呼ぶ() throws Exception {
+    // Given
+    when(deliveryAlertService.findPending(0, 10)).thenReturn(PageResponse.of(List.of(), 0, 10, 0L));
+
+    // When
+    mockMvc.perform(get("/api/admin/deliveries/alerts"))
+        .andExpect(status().isOk());
+
+    // Then
+    verify(deliveryAlertService).findPending(0, 10);
+  }
+
+  @Test
+  void 未完了一覧_sizeが上限の100なら取得できる() throws Exception {
+    // Given
+    when(deliveryAlertService.findPending(0, 100)).thenReturn(PageResponse.of(List.of(), 0, 100, 0L));
+
+    // When / Then
+    mockMvc.perform(get("/api/admin/deliveries/alerts").param("size", "100"))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void 未完了一覧_sizeが0なら400を返す() throws Exception {
+    mockMvc.perform(get("/api/admin/deliveries/alerts").param("size", "0"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void 未完了一覧_sizeが101なら400を返す() throws Exception {
+    mockMvc.perform(get("/api/admin/deliveries/alerts").param("size", "101"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void 未完了一覧_pageが負の数なら400を返す() throws Exception {
+    mockMvc.perform(get("/api/admin/deliveries/alerts").param("page", "-1"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void 未完了一覧_sizeが数字でなければ400を返す() throws Exception {
+    mockMvc.perform(get("/api/admin/deliveries/alerts").param("size", "a"))
+        .andExpect(status().isBadRequest());
   }
 
   // テストで送る正しい登録リクエストのJSON。"""で囲むと複数行の文字列をそのまま書ける（MapperのSQLと同じ書き方）
