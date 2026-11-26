@@ -16,6 +16,7 @@
       <maxHistory>30</maxHistory><!-- 30日より古いファイルは自動で削除する -->
     </rollingPolicy>
     <encoder><!-- ログをどんな形の文字にして書き込むかの設定 -->
+      <charset>UTF-8</charset>
       <pattern>${FILE_PATTERN}</pattern><!-- 上で決めたFILE_PATTERNの形式で書き込む -->
     </encoder>
   </appender>
@@ -27,6 +28,7 @@
       <maxHistory>30</maxHistory><!-- 30日より古いファイルは自動で削除する -->
     </rollingPolicy>
     <encoder><!-- ログをどんな形の文字にして書き込むかの設定 -->
+      <charset>UTF-8</charset>
       <pattern>${FILE_PATTERN}</pattern><!-- 上で決めたFILE_PATTERNの形式で書き込む -->
     </encoder>
   </appender>
