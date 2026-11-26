@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?><!-- このファイルがXMLであること、文字コードがUTF-8であることを宣言する -->
+<configuration><!-- ログの設定はすべてこのタグの中に書く -->
+  <!-- Spring Boot の標準設定（コンソール出力など）を読み込む -->
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/><!-- Spring Boot が用意している基本設定（色付きの表示形式など）を読み込む -->
+  <include resource="org/springframework/boot/logging/logback/console-appender.xml"/><!-- コンソールに出す設定（CONSOLEという名前の出力先）を読み込む -->
+
+  <!-- 何度も使う値に名前を付ける -->
+  <property name="LOG_DIR" value="logs"/><!-- ログファイルを置くフォルダ。${LOG_DIR}と書くと「logs」に置き換わる -->
+  <property name="FILE_PATTERN"
+      value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [req=%X{requestId:-}] %logger{36} - %msg%n"/><!-- 1行の形式。日時、レベル、リクエストID（なければ空）、ログを出したクラス、メッセージ、改行の順に並べる -->
+
+  <!-- アプリログ（通常ログ）のファイル -->
+  <appender name="APP_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender"><!-- ファイルに出す出力先を作り、APP_FILEという名前を付ける -->
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy"><!-- 日付が変わったら新しいファイルに切り替える -->
+      <fileNamePattern>${LOG_DIR}/app.%d{yyyy-MM-dd}.log</fileNamePattern><!-- ファイル名。%d{yyyy-MM-dd}の部分にその日の日付が入る -->
+      <maxHistory>30</maxHistory><!-- 30日より古いファイルは自動で削除する -->
+    </rollingPolicy>
+    <encoder><!-- ログをどんな形の文字にして書き込むかの設定 -->
+      <pattern>${FILE_PATTERN}</pattern><!-- 上で決めたFILE_PATTERNの形式で書き込む -->
+    </encoder>
+  </appender>
+
+  <!-- APIアクセスログのファイル -->
+  <appender name="ACCESS_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender"><!-- ファイルに出す出力先を作り、ACCESS_FILEという名前を付ける -->
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy"><!-- 日付が変わったら新しいファイルに切り替える -->
+      <fileNamePattern>${LOG_DIR}/api-access.%d{yyyy-MM-dd}.log</fileNamePattern><!-- ファイル名。%d{yyyy-MM-dd}の部分にその日の日付が入る -->
+      <maxHistory>30</maxHistory><!-- 30日より古いファイルは自動で削除する -->
+    </rollingPolicy>
+    <encoder><!-- ログをどんな形の文字にして書き込むかの設定 -->
+      <pattern>${FILE_PATTERN}</pattern><!-- 上で決めたFILE_PATTERNの形式で書き込む -->
+    </encoder>
+  </appender>
+
+  <!-- "API_ACCESS" という名前のロガーで出したログだけ、アクセスログのファイルに出す -->
+  <logger name="API_ACCESS" level="INFO" additivity="false"><!-- INFO以上を出す。additivity="false"で、下のrootの出力先には重ねて出さない -->
+    <appender-ref ref="ACCESS_FILE"/><!-- アクセスログのファイルに出す -->
+    <appender-ref ref="CONSOLE"/><!-- コンソールにも出す -->
+  </logger>
+
+  <!-- それ以外のログは、すべてコンソールとアプリログのファイルに出す -->
+  <root level="INFO"><!-- すべてのログの基本設定。INFO以上を出し、DEBUGは出さない -->
+    <appender-ref ref="CONSOLE"/><!-- コンソールに出す -->
+    <appender-ref ref="APP_FILE"/><!-- アプリログのファイルに出す -->
+  </root>
+</configuration>
