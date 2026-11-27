@@ -101,9 +101,11 @@
             <label for="deliveryDate" class="form-label">配達日 <span class="required">必須</span></label>
             <div class="form-field">
               <%-- type="date"：カレンダーから選べる入力欄。2026-11-21 の形で送られる --%>
-              <input type="date" id="deliveryDate" name="deliveryDate"
+              <%-- min：カレンダーで選べるいちばん早い日（今日）。Controller の addMinDate で渡している --%>
+              <input type="date" id="deliveryDate" name="deliveryDate" min="${minDate}"
                      class="input ${not empty fieldErrors.deliveryDate ? 'is-invalid' : ''}"
                      value="${fn:escapeXml(param.deliveryDate)}">
+              <p class="field-hint">今日以降の日付を選んでください</p>
               <c:if test="${not empty fieldErrors.deliveryDate}"><p class="field-error"><c:out value="${fieldErrors.deliveryDate}" /></p></c:if>
             </div>
           </div>

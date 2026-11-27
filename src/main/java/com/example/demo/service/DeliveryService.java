@@ -15,6 +15,8 @@ import com.example.demo.exception.ConflictException;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+
+import com.example.demo.exception.BadRequestException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,6 +68,10 @@ public class DeliveryService {
   // 配送物を登録し、登録した内容を返す
   @Transactional // メソッド内のDB操作をひとまとまりにする。途中で例外が起きたら、登録も含めて全部取り消す
   public DeliveryResponse create(CreateDeliveryRequest request) {
+    LocalDate today = LocalDate.now(clock);
+    if (request.deliveryDate().isBefore(today)) {
+      throw new BadRequestException("配達日は今日以降の日付を選択してください");
+    }
     String trackingNumber = trackingNumberGenerator.generate();// 12桁の伝票番号を作る
     while (deliveryMapper.existsByTrackingNumber(trackingNumber)) {// すでに使われている番号なら、使われていない番号が出るまで作り直す
       trackingNumber = trackingNumberGenerator.generate();

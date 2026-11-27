@@ -2,6 +2,7 @@ package com.example.demo.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.ArgumentCaptor;
@@ -15,6 +16,7 @@ import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.DeliveryStatusResponse;
 import com.example.demo.dto.PageResponse;
 import com.example.demo.entity.Delivery;
+import com.example.demo.exception.BadRequestException;
 import com.example.demo.exception.ConflictException;
 import com.example.demo.exception.NotFoundException;
 import com.example.demo.mapper.DeliveryMapper;
@@ -236,6 +238,19 @@ class DeliveryServiceTest {
     assertThat(captor.getValue().getTrackingNumber()).isEqualTo("222222222222");// 使用済みの1回目ではなく、2回目の番号でinsertされているか
   }
 
+  @Test
+  void 登録_配達日が昨日だったら400を投げる() {
+    //Given
+    LocalDate yesterday = FixedClockConfig.TODAY.minusDays(1);
+    CreateDeliveryRequest request = new CreateDeliveryRequest("山田太郎", "東京都港区1-1", "08012345678", "taro@example.com",
+        "NORMAL", yesterday, "午前中");
+
+    // When / Then
+    assertThatThrownBy(() -> deliveryService.create(request))
+        .isInstanceOf(BadRequestException.class);
+    verify(deliveryMapper, never()).insert(any());
+  }
+
   // ---------- 配送物の詳細（findByTrackingNumber） ----------
 
   @Test
@@ -302,7 +317,7 @@ class DeliveryServiceTest {
   private CreateDeliveryRequest createRequest() {
     // recordは new クラス名(値, …) で作れる。値はrecordに書いた項目の順番（氏名・住所・電話・メール・種類・配達日・時間帯）で並べる
     return new CreateDeliveryRequest("山田太郎", "東京都千代田区1-1", "09012345678", "taro@example.com", "NORMAL",
-        LocalDate.of(2026, 10, 28), "午前中");
+        FixedClockConfig.TODAY, "午前中");// 配達日は今日（時計の日付）。過去の日付は登録できないため
   }
 
   // ---------- 担当ドライバーの割り振り（assignDriver） ----------

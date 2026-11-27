@@ -17,6 +17,7 @@ import com.example.demo.dto.CreateDeliveryRequest;
 import com.example.demo.dto.DeliveryAlertResponse;
 import com.example.demo.dto.DeliveryResponse;
 import com.example.demo.dto.PageResponse;
+import com.example.demo.exception.BadRequestException;
 import com.example.demo.exception.ConflictException;
 import com.example.demo.exception.NotFoundException;
 import com.example.demo.service.DeliveryAlertService;
@@ -167,6 +168,20 @@ class AdminDeliveryControllerTest {
         .content(validJson().replace("2026-10-28", "2026/10/28")))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.status").value(400));
+  }
+
+  @Test
+  void ServiceがBadRequestExceptionを投げたら400を返す() throws Exception {
+    // Given
+    when(deliveryService.create(any(CreateDeliveryRequest.class)))
+        .thenThrow(new BadRequestException("配達日は今日以降の日付を選択してください"));
+
+    // When / Then
+    mockMvc.perform(post("/api/admin/deliveries")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(validJson()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("配達日は今日以降の日付を選択してください"));
   }
 
   // ---------- 配送物の詳細（GET /{trackingNumber}） ----------
